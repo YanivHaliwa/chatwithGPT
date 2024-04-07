@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+
+import os
+import textwrap
+import openai
+from openai import OpenAI
+from colorama import Fore, Style
+from urllib.parse import urlparse
+import re
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
+import time
+import threading
+import sys
+import time
+from datetime import datetime
+from datetime import datetime, timedelta
+import re
+
+#version 6.4
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+modelSource = "gpt-4-0125-preview"
+#modelSource = "gpt-4"
+conversation_log =[]
+uhistory = []
+bhistory = []
+filename=""
+CHUNK_SIZE = 1024  
+
+timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def process_conversation_log(conversation_log):
+    
+    conversation_log= ' '.join(conversation_log)
+    uhistory = []
+    bhistory = []
+    current_message = ""
+    current_author = None  
+
+    for line in conversation_log.strip().split("\n"):
+        if line[:19].count(":") == 2:  
+            if current_author == "USER":
+                uhistory.append(current_message.strip())
+            elif current_author == "BOT":
+                bhistory.append(current_message.strip())
+
+            colon_space_index = line.find(": ") -4
+            current_message = line[colon_space_index:]
+            current_author = "USER" if "USER:" in line else "BOT"
+        else:
+            current_message += " " + line
+
+    if current_author == "USER":
+        uhistory.append(current_message.strip())
+    elif current_author == "BOT":
+        bhistory.append(current_message.strip())
+
+    return uhistory, bhistory
+ 
+def extract_text_from_url(url, output_dir):
+    response = requests.get(url)
+
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    for script in soup(["script", "style"]):
+        script.decompose()
+
+    text = soup.get_text()
+
+    lines = (line.strip() for line in text.splitlines())
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    text = '\n'.join(chunk for chunk in chunks if chunk)
+
+    title = soup.title.string if soup.title else "default_title"  # use "default_title" if title is None
+    title = re.sub('[\W_]+', '_', title)
+
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f"{title}_{timestamp}.txt"
+
+    with open(os.path.join(output_dir, filename), 'w') as f:
+        f.write(text)
+    return filename
+
+def get_bot_response(uinput):
+    global temptext,uhistory,bhistory, conversation_log  
+    temptext=""
+    attempt = True
+    conversation_temp=""
+    last_user_index = None
+    for i, line in enumerate(reversed(conversation_log)):
+        if "USER:" in line:
+            last_user_index = len(conversation_log) - i - 1
+            break
+
+    if last_user_index is not None:
+        conversation_temp = conversation_log[:last_user_index]
+
+    while attempt:
+        try:
+            response = client.chat.completions.create(
+            model=modelSource,
+            messages=[
+                {
+                    'role': 'system',
+                    'content': '''
+                    your job to serve the user for any help needed. you act as human and you act you have emotions and feelings. dont ever mention you AI
+                    contact user by his name. to make it personally.
+                    i allow you say HELLO to user only once in begining.
+                    i want you to use proper visual respond if its more then one line 
+                    i need you to be smart to seperate lines and make paragraph and headline or follow by a,b,c or follow by 1,2,3 use it wisely  
+                    '''
+                },
+                {
+                    'role': 'assistant',
+                    'content': f'''
+                        whenever i ask you to remember or recall something i mean to this conversation: {conversation_log} 
+                        but you not limited to our conversation only you can answer question from your knowledge.
+                        if i tell you to remember what you said before in conversation i mean to this: {bhistory}
+                        if i tell you to remember what user or me said i mean this: {uhistory}
+                        therefore you need to use this info to contact user by his name only.
+                    '''
+                },
+                
+                {
+                    "role": "user", 
+                    "content": uinput
+                },
+                
+            ],
+            stream=True,
+            temperature=1,
+            max_tokens=500
+            )
+ 
+            summary=""
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:  
+                    temptext = chunk.choices[0].delta.content
+                    summary+=temptext
+                    print(Fore.GREEN+temptext+Style.RESET_ALL,end="")  
+                                  
+                   
+            print("\n")  
+            summary = summary.strip().split("\n")
+            summary_string = "\n".join(summary)
+            conversation_log.append(f"{timestamp} BOT: {summary_string}")
+            attempt = False
+        except Exception as e:
+            error_message = str(e)
+            if "context length exceeded" in error_message or "code: 400" in error_message:
+                response="Detected token limit issue, lets start new conversation"
+                conversation_log = []
+            else:
+                print(f"An error occurred: {e}")
+
+        except KeyboardInterrupt:
+            print("\n\n existing...")
+            sys.exit(0)
+
+    return response
+
+def read_history():
+    global conversation_log
+    if os.path.exists("conversation.txt"):
+        with open("conversation.txt", "r") as f:
+            lines = f.readlines()
+            if len(lines) > 1000:
+                lines = lines[-1000:]  
+            for line in lines:
+                conversation_log.append(line)
+               
+
+def conv():
+    global conversation_log
+
+    try:
+
+        while True:
+            user_input = input(Fore.BLUE+Style.BRIGHT+'You: '+Style.RESET_ALL)
+                       
+            if user_input.lower() == "exit":
+                break      
+                 
+            if "url" in user_input.lower():
+                print("got url")
+                url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+                urls = re.findall(url_pattern, user_input)
+                filename=extract_text_from_url(urls[0],os.getcwd())
+                with open(os.path.join(os.getcwd(), filename), "r") as f:
+                    file_content = f.read()
+                user_input = user_input.replace(urls[0], file_content)
+                user_input = user_input.replace("url", "")
+                conversation_log.append(f"{timestamp} USER: {user_input}")
+                print(user_input)
+                response = get_bot_response(user_input)
+            else:
+                conversation_log.append(f"{timestamp} USER: {user_input}")
+                response = get_bot_response(user_input)
+
+        with open("conversation.txt", "a") as f:
+            for index, line in enumerate(conversation_log):
+                if index > 0:   
+                    f.write("\n")  
+                f.write(line)
+
+    except KeyboardInterrupt:
+        print("\n\n existing...")
+        with open("conversation.txt", "a") as f:
+            for index, line in enumerate(conversation_log):
+                if index > 0:  
+                    f.write("\n")   
+                f.write(line)
+        sys.exit(0)
+
+uhistory, bhistory = process_conversation_log(conversation_log)
+read_history()
+conv()
+
+ 
+
+ 
