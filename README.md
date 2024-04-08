@@ -17,19 +17,9 @@ This Python script powers a ChatBot designed to provide expert-level, concise, a
 - **Terminal Result Logging**: Logs executed commands and outputs in "terminal_result.txt" for future reference.
 - **Keyboard Interrupt Handling**: Gracefully manages Ctrl+C interrupts, allowing users to exit or resume conversations smoothly.
 
-## Usage
-
-1. Ensure all required environment variables are set, including the OpenAI API key.
-2. Run the Python script to initiate the ChatBot.
-3. Input your queries related to Linux commands in the terminal.
-4. Review and decide on executing the ChatBot's suggested commands.
-5. Observe the executed command's output directly in the terminal.
-6. Engage with the ChatBot, leveraging previous messages for context as needed.
-7. To exit, either type "exit" or use the keyboard interrupt (Ctrl+C).
-
 
  
-# Advanced GPT in the shell - GPTCHAT
+# 2. Advanced GPT in the shell - GPTCHAT
 
 This Python script utilizes the OpenAI GPT model to offer a versatile text processing tool capable of handling various tasks, including extracting text from URLs and engaging in conversational interactions. It leverages OpenAI's powerful GPT-4 model to understand and generate responses based on the user's input, making it an invaluable asset for automating responses and processing textual data.
 
@@ -42,15 +32,26 @@ This Python script utilizes the OpenAI GPT model to offer a versatile text proce
 - **Dynamic Content Processing**: Adapts responses based on dynamic inputs and previous interactions, ensuring relevant and context-aware outputs.
 
 
+# 3. GPT for python - GPTPY
 
-## Requirements
+GPTpy is a Python utility designed to facilitate interaction with the Generative Pre-trained Transformer (GPT) models. It simplifies generating responses, managing conversation logs, and executing dynamically generated Python code snippets.
+
+## Features
+
+- Generate and execute Python code snippets based on GPT model responses.
+- Save and manage conversation histories for review and auditing.
+- Allow dynamic interaction with generated code, **including running and capturing output**.
+
+
+
+# Requirements
 
 - Python 3.x
 - An OpenAI API key
 - Python packages: `openai`, `colorama`, `requests`, `beautifulsoup4`
 
 
-## Installation
+# Installation
 
 1. Clone the repository or download the script to your local machine.
 2. Install the required dependencies by running:
@@ -65,11 +66,17 @@ pip install openai colorama requests beautifulsoup4
 export OPENAI_API_KEY='your_api_key_here'
 ```
 
-## License
+# Usage
+
+1. Run the Python script to initiate the ChatBot.
+2. To exit, either type "exit" or use the keyboard interrupt (Ctrl+C).
+
+
+# License
 
 This project is made available under the MIT License - see the LICENSE file for details.
 
-## Contributing
+# Contributing
 
 Contributions are welcome! Feel free to fork the project, make changes, and submit pull requests. For bugs, feature requests, or feedback, please open an issue.
 
