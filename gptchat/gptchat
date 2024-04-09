@@ -197,10 +197,6 @@ def get_bot_response(uinput):
             else:
                 print(f"An error occurred: {e}")
 
-        except KeyboardInterrupt:
-            print("\n\n existing...")
-            sys.exit(0)
-
     return response
 
 def read_history():
@@ -228,49 +224,59 @@ def save_conversation(textadd):
 def conv():
     global conversation_log
 
-    try:
-        while True:
-            ui=""
-            user_input=""
-            user_input = input(Fore.BLUE+Style.BRIGHT+'You: '+Style.RESET_ALL)
-            ui=user_input.lower()
+while True:
+    try:   
+        ui=""
+        user_input=""
+        user_input = input(Fore.BLUE+Style.BRIGHT+'You: '+Style.RESET_ALL)
+        ui=user_input.lower()
 
-            if ui == "exit":
-                break      
-             
-            if ui == "/help":
-                print(help_text)   
-                continue  
+        if ui == "exit":
+            break      
+            
+        if ui == "/help":
+            print(help_text)   
+            continue  
 
-            if ui == "/clear":
-                confirm=input("are you sure you want to delete all recoreds of conversation file and code output? y/n\n")
-                if confirm.lower() == "y":
-                    clear_files()
+        if ui == "/clear":
+            confirm=input("are you sure you want to delete all recoreds of conversation file and code output? y/n\n")
+            if confirm.lower() == "y":
+                clear_files()
+            continue
+
+        if "url" in ui:        
+            url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+            urls = re.findall(url_pattern, user_input)
+            filename=extract_text_from_url(urls[0],os.getcwd())
+            if filename:
+                print("got url")
+                with open(os.path.join(os.getcwd(), filename), "r") as f:
+                    file_content = f.read()
+                ui = ui.replace(urls[0], file_content)
+                ui = ui.replace("url", "")
+                print(ui+"\n\n")
+            else:
                 continue
 
-            if "url" in ui:        
-                url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-                urls = re.findall(url_pattern, user_input)
-                filename=extract_text_from_url(urls[0],os.getcwd())
-                if filename:
-                    print("got url")
-                    with open(os.path.join(os.getcwd(), filename), "r") as f:
-                        file_content = f.read()
-                    ui = ui.replace(urls[0], file_content)
-                    ui = ui.replace("url", "")
-                    print(ui+"\n\n")
-                else:
-                    continue
-
-            texttoadd=f"{timestamp} USER: {ui}"
-            conversation_log.append(texttoadd)
-            save_conversation(texttoadd)
-            response = get_bot_response(ui)
-         
+        texttoadd=f"{timestamp} USER: {ui}"
+        conversation_log.append(texttoadd)
+        save_conversation(texttoadd)
+        response = get_bot_response(ui)
+        
 
     except KeyboardInterrupt:
-        print("\n\n existing...")
-        sys.exit(0)
+        print("\n")   
+        try:
+            inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+            if inp.lower() == "y":
+                print("Exiting...")
+                break  
+            else:
+                print("Resuming...")   
+        except KeyboardInterrupt:
+            print("\nMultiple interrupt signals received. Exiting...")
+            break   
+ 
 
 uhistory, bhistory = process_conversation_log(conversation_log)
 read_history()
