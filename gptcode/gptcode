@@ -29,15 +29,9 @@ print(alert_message)
 
 help_text = (
     f"This script is designed to use GPT to suggest,process, execute Linux commands based on user input.\n\n"
-    
-    f"{Fore.CYAN}Usage Instructions:{Style.RESET_ALL}\n"
-    f"Type your command directly and the script will process it through GPT, suggesting a Linux command to execute.\n"
-    f"You can then choose to execute the command directly from the script.\n\n"
-    
     f"{Fore.CYAN}Options:{Style.RESET_ALL}\n"
     f"  {Fore.GREEN}/help{Style.RESET_ALL}               - Show this help message.\n"
     f"  {Fore.GREEN}exit{Style.RESET_ALL}                - Exit the script.\n"    
-    
     f"{Fore.RED}Important Notes:{Style.RESET_ALL}\n"
     f"- Use caution when executing suggested commands, especially those prefixed with {Fore.RED}sudo{Style.RESET_ALL}.\n\n"
     )
