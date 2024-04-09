@@ -18,7 +18,7 @@ import subprocess
 import shlex
 from colorama import Fore, Style
 
-#version 6.4
+#version 9.4
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 modelSource = "gpt-4-0125-preview"
@@ -127,13 +127,13 @@ def get_bot_response(uinput):
         temperature=1,
         max_tokens=500
         )
-
         summary=""
+        temptext=""
         for chunk in response:
             if chunk.choices[0].delta.content is not None:  
                 temptext = chunk.choices[0].delta.content
                 summary+=temptext
-                print(Fore.GREEN+temptext+Style.RESET_ALL,end="")           
+                print(Fore.GREEN+temptext+Style.RESET_ALL,end="",flush=True)            
         print("\n")   
         summary = summary.strip().split("\n")
         summary_string = "\n".join(summary)
