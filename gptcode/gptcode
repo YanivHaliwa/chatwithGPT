@@ -4,6 +4,7 @@ import os
 import textwrap
 import openai
 from openai import OpenAI
+import colorama
 from colorama import Fore, Style
 from urllib.parse import urlparse
 import re
@@ -19,6 +20,27 @@ import shlex
 from colorama import Fore, Style
 
 #version 9.4
+
+
+colorama.init(autoreset=True)
+alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
+print(alert_message)
+
+
+help_text = (
+    f"This script is designed to use GPT to suggest,process, execute Linux commands based on user input.\n\n"
+    
+    f"{Fore.CYAN}Usage Instructions:{Style.RESET_ALL}\n"
+    f"Type your command directly and the script will process it through GPT, suggesting a Linux command to execute.\n"
+    f"You can then choose to execute the command directly from the script.\n\n"
+    
+    f"{Fore.CYAN}Options:{Style.RESET_ALL}\n"
+    f"  {Fore.GREEN}/help{Style.RESET_ALL}               - Show this help message.\n"
+    f"  {Fore.GREEN}exit{Style.RESET_ALL}                - Exit the script.\n"    
+    
+    f"{Fore.RED}Important Notes:{Style.RESET_ALL}\n"
+    f"- Use caution when executing suggested commands, especially those prefixed with {Fore.RED}sudo{Style.RESET_ALL}.\n\n"
+    )
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 modelSource = "gpt-4-0125-preview"
@@ -137,7 +159,9 @@ def get_bot_response(uinput):
         print("\n")   
         summary = summary.strip().split("\n")
         summary_string = "\n".join(summary)
-        conversation_log.append(f"{timestamp} BOT: {summary_string}")
+        texttoadd=f"{timestamp} BOT: {summary_string}\n"
+        conversation_log.append(texttoadd)
+        save_conversation(texttoadd)
 
     except Exception as e:
         error_message = str(e)
@@ -175,16 +199,47 @@ def read_terminal():
             for line in lines:
                 terminal_log.append(line)
 
+def clear_files():
+    conversation_log = []
+    with open("conversation.txt", "w") as file:
+        pass 
+    with open("terminal_result.txt", "w") as file:
+        pass  
+
+def save_conversation(textadd):
+    global conversation_log
+    with open("conversation.txt", "a") as f:
+        f.write(textadd + "\n") 
+   
+
 def conv():
     global conversation_log
     while True:
         try:
+            ui=""
+            user_input=""
             user_input = input(Fore.BLUE + Style.BRIGHT + 'You: ' + Style.RESET_ALL).strip()
-            if user_input.lower() == "exit":
-                break
-            conversation_log.append(f"{timestamp} USER: {user_input}")
-            command = get_bot_response(user_input).split()
+            ui=user_input.lower()
 
+            if ui == "exit":
+                break
+
+            if ui == "/help":
+                print(help_text)   
+                continue  
+            
+
+            if ui == "/clear":
+                confirm=input("are you sure you want to delete all recoreds of conversation file and code output? y/n\n")
+                if confirm.lower() == "y":
+                    clear_files()
+                continue
+            
+            texttoadd=f"{timestamp} USER: {ui}"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+
+            command = get_bot_response(ui).split()
             if command:
                 execute = input(Fore.YELLOW + "Run this command? (y/n): " + Style.RESET_ALL).strip().lower()
                 if execute == 'y':
@@ -230,12 +285,12 @@ try:
 except Exception as e:
         print(f"An error occurred: {e}")
 finally:  
-        conversation_log = [line for line in conversation_log if line.strip()]
-        with open("conversation.txt", "a") as f:
-            for index, line in enumerate(conversation_log):
-                if index > 0:   
-                    f.write("\n")  
-                f.write(line)
+        # conversation_log = [line for line in conversation_log if line.strip()]
+        # with open("conversation.txt", "a") as f:
+        #     for index, line in enumerate(conversation_log):
+        #         if index > 0:   
+        #             f.write("\n")  
+        #         f.write(line)
                    
         print("Goodbye!")
         sys.exit(0)

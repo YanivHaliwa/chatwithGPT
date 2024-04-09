@@ -1,23 +1,44 @@
 #!/usr/bin/env python3
+
 import os
 import textwrap
 import openai
 from openai import OpenAI
+import colorama
 from colorama import Fore, Style
 from urllib.parse import urlparse
 import re
 import requests
-from bs4 import BeautifulSoup
-from datetime import datetime
 import time
 import threading
 import sys
 import time
-from datetime import datetime
 from datetime import datetime, timedelta
-import re
+from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+from bs4 import BeautifulSoup
+from datetime import datetime
+ 
+
 
 #version 9.4
+
+colorama.init(autoreset=True)
+alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
+print(alert_message)
+
+help_text = (
+    f"{Fore.YELLOW}Welcome to the Interactive Chat and URL Text Extraction Script!{Style.RESET_ALL}\n"
+    f"This script leverages OpenAI's GPT for conversation and extracts text from specified URLs to facilitate dynamic interactions.\n\n"
+    
+    f"{Fore.CYAN}Special Commands:{Style.RESET_ALL}\n"
+    f"  {Fore.GREEN}/help{Style.RESET_ALL} - Show this help message.\n"
+    f"  {Fore.GREEN}exit{Style.RESET_ALL}  - Exit the script.\n"
+    f"  {Fore.GREEN}url{Style.RESET_ALL}   - if you mention 'url' and then link then ask question about it,\n"
+    f"          gpt will read the text from the url and give response accordingly.\n"
+    f"          exmaple:\n"
+    f"          url https://example.com  exaplain me this article/summarize this article.\n\n"
+    f"          important: this option may not work on all websites! "
+)
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 modelSource = "gpt-4-0125-preview"
@@ -59,30 +80,49 @@ def process_conversation_log(conversation_log):
     return uhistory, bhistory
  
 def extract_text_from_url(url, output_dir):
-    response = requests.get(url)
+    try:
+        response = requests.get(url, timeout=10)  # Added timeout for the request
+        response.raise_for_status()  # This will raise an HTTPError for bad responses
 
-    response.raise_for_status()
+        response = requests.get(url)
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+        response.raise_for_status()
 
-    for script in soup(["script", "style"]):
-        script.decompose()
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-    text = soup.get_text()
+        for script in soup(["script", "style"]):
+            script.decompose()
 
-    lines = (line.strip() for line in text.splitlines())
-    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    text = '\n'.join(chunk for chunk in chunks if chunk)
+        text = soup.get_text()
 
-    title = soup.title.string if soup.title else "default_title"  # use "default_title" if title is None
-    title = re.sub('[\W_]+', '_', title)
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = '\n'.join(chunk for chunk in chunks if chunk)
 
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    filename = f"{title}_{timestamp}.txt"
+        title = soup.title.string if soup.title else "default_title"  # use "default_title" if title is None
+        title = re.sub('[\W_]+', '_', title)
 
-    with open(os.path.join(output_dir, filename), 'w') as f:
-        f.write(text)
-    return filename
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f"{title}_{timestamp}.txt"
+
+        with open(os.path.join(output_dir, filename), 'w') as f:
+            f.write(text)
+        return filename
+
+    except HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}") 
+    except ConnectionError:
+        print("Error connecting to the server. Please check your internet connection or the website may be down.")
+    except Timeout:
+        print("The request timed out. Please try again later.")
+    except RequestException as err:
+        print(f"An unexpected error occurred: {err}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    return None
+
+    
 
 def get_bot_response(uinput):
     global temptext,uhistory,bhistory, conversation_log  
@@ -132,7 +172,7 @@ def get_bot_response(uinput):
             ],
             stream=True,
             temperature=1,
-            max_tokens=500
+            max_tokens=3000
             )
             summary=""
             temptext=""
@@ -144,7 +184,10 @@ def get_bot_response(uinput):
             print("\n")  
             summary = summary.strip().split("\n")
             summary_string = "\n".join(summary)
-            conversation_log.append(f"{timestamp} BOT: {summary_string}")
+            texttoadd=f"{timestamp} BOT: {summary_string}\n"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+
             attempt = False
         except Exception as e:
             error_message = str(e)
@@ -169,48 +212,64 @@ def read_history():
                 lines = lines[-1000:]  
             for line in lines:
                 conversation_log.append(line)
-               
+
+ 
+def clear_files():
+    conversation_log = []
+    with open("conversation.txt", "w") as file:
+        pass 
+
+def save_conversation(textadd):
+    global conversation_log
+    with open("conversation.txt", "a") as f:
+        f.write(textadd + "\n") 
+      
 
 def conv():
     global conversation_log
 
     try:
-
         while True:
+            ui=""
+            user_input=""
             user_input = input(Fore.BLUE+Style.BRIGHT+'You: '+Style.RESET_ALL)
-                       
-            if user_input.lower() == "exit":
+            ui=user_input.lower()
+
+            if ui == "exit":
                 break      
-                 
-            if "url" in user_input.lower():
-                print("got url")
+             
+            if ui == "/help":
+                print(help_text)   
+                continue  
+
+            if ui == "/clear":
+                confirm=input("are you sure you want to delete all recoreds of conversation file and code output? y/n\n")
+                if confirm.lower() == "y":
+                    clear_files()
+                continue
+
+            if "url" in ui:        
                 url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
                 urls = re.findall(url_pattern, user_input)
                 filename=extract_text_from_url(urls[0],os.getcwd())
-                with open(os.path.join(os.getcwd(), filename), "r") as f:
-                    file_content = f.read()
-                user_input = user_input.replace(urls[0], file_content)
-                user_input = user_input.replace("url", "")
-                conversation_log.append(f"{timestamp} USER: {user_input}")
-                print(user_input)
-                response = get_bot_response(user_input)
-            else:
-                conversation_log.append(f"{timestamp} USER: {user_input}")
-                response = get_bot_response(user_input)
+                if filename:
+                    print("got url")
+                    with open(os.path.join(os.getcwd(), filename), "r") as f:
+                        file_content = f.read()
+                    ui = ui.replace(urls[0], file_content)
+                    ui = ui.replace("url", "")
+                    print(ui+"\n\n")
+                else:
+                    continue
 
-        with open("conversation.txt", "a") as f:
-            for index, line in enumerate(conversation_log):
-                if index > 0:   
-                    f.write("\n")  
-                f.write(line)
+            texttoadd=f"{timestamp} USER: {ui}"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+            response = get_bot_response(ui)
+         
 
     except KeyboardInterrupt:
         print("\n\n existing...")
-        with open("conversation.txt", "a") as f:
-            for index, line in enumerate(conversation_log):
-                if index > 0:  
-                    f.write("\n")   
-                f.write(line)
         sys.exit(0)
 
 uhistory, bhistory = process_conversation_log(conversation_log)
