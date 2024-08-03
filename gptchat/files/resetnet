@@ -1,8 +1,0 @@
-#!/bin/bash
-sudo -S <<< '314674' systemctl daemon-reload
-sudo -S <<< '314674' sudo systemctl restart NetworkManager
-sudo systemctl restart networking
-sudo -S <<< '314674'  systemctl stop  systemd-resolved 
-sudo systemctl start  systemd-resolved 
-sudo -S <<< '314674'  airmon-ng stop wlan0mon > /dev/null 2>&1
-sudo airmon-ng stop wlan0 > /dev/null 2>&1
