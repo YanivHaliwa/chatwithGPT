@@ -40,7 +40,7 @@ help_text = (
     f"          Example:\n"
     f"          /read /path/to/your/file.txt\n\n"
     f"  {Fore.GREEN}/translate{Style.RESET_ALL} - only translate next words without any exaplaintion.\n\n"
-    # f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n"
+    f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n"
     f"  {Fore.GREEN}/readfiles{Style.RESET_ALL} - Read all supported files from the 'files' folder in the current directory.\n"
     f"          Supported file types are: txt, md, html, css, xml, pdf, xls, xlsx, csv, py.\n"
 )
@@ -548,42 +548,39 @@ while True:
                 ui=f"read this file name: {file} question: {user_input2}"
                 texttoadd= f"{timestamp} USER: {ui}"  
                     
-      
+        if "/image" in ui: 
+            image_path=extract_filepic(ui)
+            text_from_image = ocr_image(image_path)
+            user_input2=input(Fore.BLUE + Style.BRIGHT + 'what the request on the image?: ' + Style.RESET_ALL).strip()
+            texttoadd=f"{timestamp} USER: IMAGE - {user_input2}"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+            
+            gpt4o_response = process_image_with_gpt4o(image_path,user_input2,text_from_image)
 
-        # if "/image" in ui: 
-        #     image_path=extract_filepic(ui)
-        #     text_from_image = ocr_image(image_path)
-        #     user_input2=input(Fore.BLUE + Style.BRIGHT + 'what the request on the image?: ' + Style.RESET_ALL).strip()
-        #     gpt4o_response = process_image_with_gpt4o(image_path,user_input2,text_from_image)
-
-        #     # Check if the response has 'choices' key and handle errors
-        #     if 'choices' in gpt4o_response:
-        #         summary = gpt4o_response['choices'][0]['message']['content']
-        #         print(Fore.GREEN + summary+"\n" + Style.RESET_ALL, end="", flush=True)
-        #         print("")
-        #     else:
-        #         print(Fore.RED + "Error in GPT-4o response:" + str(gpt4o_response) + Style.RESET_ALL)
-        #         print("")
-        #     texttoadd=f"{timestamp} USER: IMAGE - {user_input2}"
-        #     conversation_log.append(texttoadd)
-        #     save_conversation(texttoadd)
-        #     texttoadd=f"{timestamp} BOT: {summary}\n"
-        #     conversation_log.append(texttoadd)
-        #     save_conversation(texttoadd)
-        #     continue
+            # Check if the response has 'choices' key and handle errors
+            if 'choices' in gpt4o_response:
+                summary = gpt4o_response['choices'][0]['message']['content']
+                print(Fore.GREEN + summary+"\n" + Style.RESET_ALL, end="", flush=True)
+                print("")
+            else:
+                print(Fore.RED + "Error in GPT-4o response:" + str(gpt4o_response) + Style.RESET_ALL)
+                print("")
+            
+            texttoadd=f"{timestamp} BOT: {summary}\n"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+            continue
 
         if "/tr" in ui:
             text=ui.replace("/tr", "")
             texttoadd=f"{timestamp} USER: translate this {text}"
             continue
 
-        conversation_log.append(texttoadd)
-        save_conversation(texttoadd)
-       # if "/image" not in ui:
-       # print(ui)
-        response = get_bot_response(ui)
-
-        
+        if "/image" not in ui: 
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+            response = get_bot_response(ui)
 
     except KeyboardInterrupt:
         print("\n")   
