@@ -1,0 +1,12 @@
+# Ignore specific conversation.txt files
+gptshell/conversation.txt
+gptpy/code_output.txt
+gptpy/conversation.txt
+gptchat/conversation.txt
+gptshell/terminal_result.txt
+gptchat/תקנון-עדיף.pdf
+gptchat/תקנון-שיא.pdf
+
+# Ignore the transform_later directory
+transform_later/
+files/
