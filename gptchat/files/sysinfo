@@ -1,0 +1,18 @@
+#!/bin/bash
+bold=$(tput bold)
+normal=$(tput sgr0)
+
+echo "${bold}hostnamne:${normal}:"
+hostname 
+
+echo "${bold}id:${normal}"
+id
+
+echo "${bold}names:${normal}" 
+uname -a 
+
+echo "${bold}version:${normal}"
+cat /proc/version
+
+echo "${bold}issue:${normal}"
+cat /etc/issue

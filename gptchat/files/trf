@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+import sys
+import os
+from deep_translator import GoogleTranslator, MyMemoryTranslator
+import re
+import chardet   
+from colorama import init, Fore, Style
+import cohere
+import json
+from collections import deque
+from langdetect import detect
+from openai import OpenAI
+
+
+#version 18.7.24
+
+co = cohere.Client(os.getenv("COHERE_API_KEY"))
+modelco= 'command-nightly'
+
+client_oi = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+modelgp = "gpt-4o"
+
+# Initialize colorama
+init()
+filevalid=False
+
+def translate_gpt(texttogpt):
+    try:
+        text=""
+        if texttogpt is None:
+            return text
+        elif texttogpt.strip()=="":
+            return text 
+        else:
+            response = client_oi.chat.completions.create(
+            model=modelgp,
+            messages=[
+                {
+                    'role': 'system',
+                    'content': f"""
+                    you are transaltor expert in english and hebrew. 
+                    you going to translate from english to hebrew.
+                    your respond should be only the translate nothing else.
+                    i need you to think on the context from user not just colde translate. 
+                    i also need you figure sland of people . dont just transalte words but think how they use it and that translte. 
+                    must remember you translating srt files so i need you to be precise with timestamp and title numbers as in original exactly.
+                    also remember you cant exaplain anything in process you only trnaslating accoding to source only.
+                    do not use in your answer any qoute or other words that not in the original you stick to translate only
+                    do not add words "plaintext" in your translation just if its exist in the original  
+                    do not write anything but hebrew translate ONLY     
+                """
+                },
+                
+                {
+                    "role": "user", 
+                    "content":"translate this to hebrew: "+texttogpt
+                },
+                
+            ],
+            stream=True,
+            temperature=1,
+            max_tokens=3000
+            )
+        
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:  
+                    temptext = chunk.choices[0].delta.content
+                    text+=temptext
+            return text
+    except Exception as e:
+        pass
+def translate_cohere(texttoco):   
+    try:
+        text=""
+        token_count=0
+        for event in co.chat_stream(
+                model=modelco,
+                message="translate this to hebrew: "+texttoco,
+                temperature=0.7,
+                preamble="""you are transaltor expert in english and hebrew. 
+                you going to translate from english to hebrew.
+                your respond should be only the translate nothing else.
+                i need you to think on the context from user not just colde translate. 
+                i also need you figure sland of people . dont just transalte words but think how they use it and that translte. 
+                must remember you translating srt files so i need you to be precise with timestamp and title numbers as in original exactly.
+                also remember you cant exaplain anything in process you only trnaslating accoding to source only.
+                do not use in your answer any qoute or other words that not in the original you stick to translate only 
+                do not add words "plaintext" in your translation just if its exist in the original 
+                do not write anything but hebrew translate ONLY 
+                """
+            ):
+
+            if event.event_type == "text-generation":
+                response_tokens = len(event.text.split())  # Estimate token count
+                token_count += response_tokens
+                text+=event.text
+            elif event.event_type == "stream-end":
+                break
+        return text
+    
+    except Exception as e:
+        pass
+
+def read_file_with_detected_encoding(file_path):
+    with open(file_path, 'rb') as file:
+        raw_data = file.read()
+    
+    detected_encoding = chardet.detect(raw_data)['encoding']
+    
+    try:
+        # Try to read the file with the detected encoding
+        with open(file_path, 'r', encoding=detected_encoding) as file:
+            return file.read()
+    except (UnicodeDecodeError, TypeError):
+        # Fallback to 'utf-8' encoding if detected encoding fails
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                return file.read()
+        except UnicodeDecodeError:
+            # Fallback to 'latin-1' if 'utf-8' fails
+            with open(file_path, 'r', encoding='latin-1') as file:
+                return file.read()
+ 
+
+
+def is_timecode_line(line):
+    return re.match(r'\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}', line)
+
+
+def format_translated_chunks(translated_chunks):
+    formatted_blocks = []
+    current_block = []
+   # rlm = "\u200F"  # Right-to-Left Mark
+
+    expecting_number = True
+
+    for chunk in translated_chunks:
+        lines = chunk.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            processed_line = line if line else line
+
+            if expecting_number:
+                if line.isdigit():
+                    if current_block:  # Finalize the current block if not empty
+                        formatted_blocks.append('\n'.join(current_block) + '\n')
+                        current_block = []
+                    current_block.append(processed_line)
+                    expecting_number = False
+                else:
+                    current_block.append(processed_line)
+            else:
+                current_block.append(processed_line)
+                if is_timecode_line(line):
+                    expecting_number = True
+
+    if current_block:  # Add the last block if exists
+        formatted_blocks.append('\n'.join(current_block))
+
+    return '\n'.join(formatted_blocks)
+
+def smart_chunker(text, chunk_size):
+    chunks = []
+    start_index = 0
+    while start_index < len(text):
+        # Find the end index for this chunk, which is start index + chunk size
+        end_index = start_index + chunk_size
+        
+        # If the end index is beyond the length of the text, set it to the length of the text
+        if end_index > len(text):
+            end_index = len(text)
+        else:
+            # Ensure the end index does not break in the middle of a subtitle entry
+            # Find the nearest previous newline character to avoid cutting a subtitle in half
+            end_index = text.rfind('\n\n', start_index, end_index) + 2
+        
+        # Append the current chunk to the list of chunks
+        chunks.append(text[start_index:end_index])
+        
+        # Update the start index for the next chunk
+        start_index = end_index
+
+    return chunks
+def text_chunker(text, chunk_size):
+    chunks = []
+    start_index = 0
+    while start_index < len(text):
+        # Find the end index for this chunk, which is start index + chunk size
+        end_index = start_index + chunk_size
+        
+        # If the end index is beyond the length of the text, set it to the length of the text
+        if end_index > len(text):
+            end_index = len(text)
+        else:
+            # Ensure the end index does not break in the middle of a paragraph
+            # Find the nearest previous newline character to avoid cutting a paragraph in half
+            end_index = text.rfind('\n\n', start_index, end_index) + 2
+        
+        # Append the current chunk to the list of chunks
+        chunks.append(text[start_index:end_index])
+        
+        # Update the start index for the next chunk
+        start_index = end_index
+
+    return chunks
+
+def translate_file(file_path, translator):
+    # #<deep_translator.google.GoogleTranslator object at 0x7f449b3dc9d0>
+    if translator=="google":
+        trs=GoogleTranslator(target='iw')
+            
+    print(f"Translator: {translator}")
+    file_dir, file_name = os.path.split(file_path)
+    file_name_without_ext, file_ext = os.path.splitext(file_name)
+    if "heb" in file_name:
+        return  # Skip files that already include 'heb' in the filename
+    output_file_path = os.path.join(file_dir, f"{file_name_without_ext}-heb{file_ext}")
+    text=""
+    newtext=""
+    file_extension = file_ext
+   
+    try:
+        text = read_file_with_detected_encoding(file_path)
+        s = detect(text)
+        print(f"Detected source language: {s}")
+
+        translated_chunks = []
+        
+        if file_extension == '.srt':
+            chunk_size = 1000
+            text_chunks = smart_chunker(text, chunk_size)
+        else:
+            chunk_size = 5000
+            text_chunks = text_chunker(text, chunk_size)
+            
+        translated_chunks = []
+       
+        for i, chunk in enumerate(text_chunks):
+            print(f"Translated chunk {i+1}/{len(text_chunks)}", end='\r')
+            source_language = detect(chunk)
+            if translator=="google":
+                translated_chunk = trs.translate(chunk,source=source_language)
+            elif translator=="cohere":
+                translated_chunk = translate_cohere(chunk)
+            elif translator=="chatgpt":
+                translated_chunk = translate_gpt(chunk)
+                 
+            translated_chunks.append(translated_chunk)
+            
+        
+        #after translating all chunks, format them
+        formatted_translated_text = format_translated_chunks(translated_chunks)
+
+        # Write the formatted translated text to the output file
+        with open(output_file_path, 'w') as output_file:
+            output_file.write(formatted_translated_text)
+
+        success= f"{Fore.YELLOW}{Style.BRIGHT}Translation successful. Translated file saved to: {Style.RESET_ALL}"
+        print(f"{success}'{output_file_path}'.")
+
+
+    except Exception as e:
+        print(f"Translation failed for {file_path}. Error:", str(e))
+    except KeyboardInterrupt:
+        print("\r" + " " * 100 + "\r" + "exiting..", flush=True)
+        sys.exit(0)
+
+def collect_srt_files(directory):
+    srt_files = []
+    # Loop through only files in the specified directory
+    for file in os.listdir(directory):
+        file_path = os.path.join(directory, file)
+        # Check if it's a file and meets the criteria
+        if os.path.isfile(file_path) and (file.endswith(".srt") or file.endswith(".txt") or file.endswith(".md")) and ("heb" not in file and ".he." not in file):
+            srt_files.append(file_path)
+    return srt_files
+
+def is_file_empty(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read().strip()
+            if len(content) == 0:
+                return True
+            else:
+                return False
+    except Exception as e:
+        return False
+    
+def main():
+    translator = "google"
+    if len(sys.argv) < 3:
+        print("""Usage: python translate_file.py -f <file_path> OR -d <directory_path> 
+       option:
+       default translate is google. but you can use AI
+            -co to translate with cohere ai 
+            -gp to translate with chatgpt     
+                """)
+        sys.exit(1)
+
+    if len(sys.argv) == 4:
+        if sys.argv[3] == '-co':
+            translator = "cohere"
+        if sys.argv[3] == '-gp':
+            translator = "chatgpt"
+            
+   #translator = GoogleTranslator(target='iw')
+    option = sys.argv[1]
+    path = sys.argv[2]
+    files_srt=[]
+    file_path=""
+    filevalid=False
+
+    if option == '-f':
+        files_srt.append(path)
+        if (path.endswith(".srt") or path.endswith(".txt") or path.endswith(".md")) and ("heb" not in path and ".he." not in path):
+            filevalid=True
+         
+
+    elif option == '-d':
+        files_srt = collect_srt_files(path)
+        if files_srt:
+            filevalid=True
+        
+        
+    else:
+        invalidtemp= f"{Fore.RED}{Style.BRIGHT}Invalid option. Use -f for file or -d for directory.{Style.RESET_ALL}"
+        print(invalidtemp)
+        sys.exit(0)
+    
+   
+    try:
+        if filevalid and files_srt:
+            filetemp=f"{Fore.BLUE}{Style.BRIGHT}files to translate:{Style.RESET_ALL}"
+            print(filetemp)
+            for f in files_srt:
+                print(f)
+            print()
+     
+            for file_path in files_srt:
+                empty=is_file_empty(file_path)
+                if empty:
+                    print(f"{Fore.YELLOW}{Style.BRIGHT}File is empty. Skipping:{Style.RESET_ALL}",file_path)
+                else:
+                    trtemp= f"{Fore.GREEN}{Style.BRIGHT}Translating:{Style.RESET_ALL}"
+                    print(trtemp,file_path)
+                    translate_file(file_path, translator)
+
+                    intemp=f"{Fore.GREEN}{Style.BRIGHT}\nwould you like to delete the old source files? y/n \n{Style.RESET_ALL}"
+                    delconfirm=input(intemp)
+                    if delconfirm.lower() == "y":
+                        for fi in files_srt:
+                            if os.path.exists(fi):
+                                os.remove(fi)  # Delete the file
+                        print(f"\nDeleted")
+        else:     
+            nothing= f"{Fore.RED}{Style.BRIGHT}Nothing to translate{Style.RESET_ALL}"
+            print(nothing)
+    except KeyboardInterrupt:
+        print("\r" + " " * 100 + "\r" + "exiting..", flush=True)
+        sys.exit(0)
+                 
+if __name__ == "__main__":
+    main()
+
+
+ 

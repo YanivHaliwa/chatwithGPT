@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Check if a file is provided
+if [ -z "$1" ]; then
+  echo -e "\033[31mNo file provided. Usage: ./examine.sh <filename>\033[0m"
+  exit 1
+fi
+
+clear
+
+# File to examine
+FILE="$1"
+
+# Add some color and title
+echo -e "\033[32m########## File Examination ##########\033[0m"
+ 
+
+# Using 'stat' for detailed file stats
+echo -e "\033[34m### File Stats ###\033[0m"
+stat "$FILE"
+
+# Using 'file' to determine file type
+echo -e "\033[34m### File Type ###\033[0m"
+file "$FILE"
+
+# Using 'mimetype' to determine MIME type
+echo -e "\033[34m### MIME Type ###\033[0m"
+mimetype "$FILE"
+
+# Using 'sha256sum' for SHA-256 hash
+echo -e "\033[34m### SHA-256 Hash ###\033[0m"
+sha256sum "$FILE"
+
+# Using 'md5sum' for MD5 hash
+echo -e "\033[34m### MD5 Hash ###\033[0m"
+md5sum "$FILE"
+
+# Using 'head' with 'strings' to show the first 10 strings
+echo -e "\033[34m### Head Strings ###\033[0m"
+strings "$FILE" | head -n 50
+
+# Using 'tail' with 'strings' to show the last 10 strings
+echo -e "\033[34m### Tail Strings ###\033[0m"
+strings "$FILE" | tail -n 50
+
+# Using 'binwalk' to analyze binary data
+echo -e "\033[34m### Binwalk ###\033[0m"
+binwalk "$FILE"
+
+# Using 'steghide' to check for hidden data
+echo -e "\033[34m### Steghide ###\033[0m"
+steghide info "$FILE"
+
+# Using 'exiftool' for metadata
+echo -e "\033[34m### ExifTool ###\033[0m"
+exiftool "$FILE"
+
+# Using 'head' with 'hexdump' to show the first 10 lines
+echo -e "\033[34m### Head Hexdump ###\033[0m"
+hexdump -C "$FILE" | head -n 50
+
+# Using 'tail' with 'hexdump' to show the last 10 lines
+echo -e "\033[34m### Tail Hexdump ###\033[0m"
+hexdump -C "$FILE" | tail -n 50
+
+# Using 'head' with 'xxd' to show the first 10 lines
+echo -e "\033[34m### Head xxd ###\033[0m"
+xxd "$FILE" | head -n 50
+
+# Using 'tail' with 'xxd' to show the last 10 lines
+echo -e "\033[34m### Tail xxd ###\033[0m"
+xxd "$FILE" | tail -n 50
+
+# Reset color
+echo -e "\033[0m"

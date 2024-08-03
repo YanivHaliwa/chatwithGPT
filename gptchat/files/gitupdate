@@ -1,0 +1,14 @@
+
+#!/bin/bash
+
+# Remove .gitignore from the staging area (if needed)
+git rm --cached .gitignore
+
+# Add all changes to the staging area
+git add .
+
+# Commit the changes with a message
+git commit -m "update"
+
+# Push the changes to the remote repository
+git push origin master

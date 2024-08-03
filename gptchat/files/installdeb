@@ -1,0 +1,5 @@
+#!/bin/bash
+
+sudo dpkg -i $@
+sudo apt install -f
+sudo apt-get update

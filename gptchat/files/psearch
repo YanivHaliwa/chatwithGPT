@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Check if there are no arguments
+if [ "$#" -eq 0 ]; then
+  echo "You must provide at least one search term."
+  exit 1
+fi
+
+# Check for the -i flag
+if [ "$1" == "-i" ]; then
+  include_installed=true
+  shift
+else
+  include_installed=false
+fi
+
+# Start with a command that includes the first search term
+search_command="apt-cache search $1 | grep -i $1"
+
+# Loop through the rest of the arguments, adding them to the grep command
+for term in "${@:2}"; do
+  search_command="$search_command | grep -i $term"
+done
+
+# ANSI escape code for red and bright green text
+red='\033[0;31m'
+green='\033[1;32m'
+# ANSI escape code to reset text color
+no_color='\033[0m'
+
+# Execute the constructed command and filter based on installation status
+eval $search_command | while IFS= read -r line; do
+  package_name=$(echo $line | cut -d' ' -f1)
+ 
+  if dpkg-query -W -f='${Status}' $package_name 2>/dev/null | grep -q "install ok installed"; then
+    is_installed=true
+    status="${green}INSTALLED${no_color}: "
+  else
+    is_installed=false
+    if $include_installed; then
+      status="${red}NOT INSTALLED${no_color}: "
+    else
+      status=""
+    fi
+  fi
+  
+  if $include_installed || ! $is_installed; then
+    echo -e "$status$line"
+  fi
+done

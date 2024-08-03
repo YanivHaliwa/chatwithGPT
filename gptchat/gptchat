@@ -14,7 +14,8 @@ from pathlib import Path
 import pandas as pd
 from bs4 import BeautifulSoup
 from PIL import Image
-   
+from pathlib import Path
+
 #version 17.5
 
 colorama.init(autoreset=True)
@@ -40,7 +41,8 @@ help_text = (
     f"          /read /path/to/your/file.txt\n\n"
     f"  {Fore.GREEN}/translate{Style.RESET_ALL} - only translate next words without any exaplaintion.\n\n"
     f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n"
-
+    f"  {Fore.GREEN}/readfiles{Style.RESET_ALL} - Read all supported files from the 'files' folder in the current directory.\n"
+    f"          Supported file types are: txt, md, html, css, xml, pdf, xls, xlsx, csv, py.\n"
 )
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -57,6 +59,8 @@ CHUNK_SIZE = 1024
 texttoadd=""
 
 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
 
 def process_conversation_log(conv):
     conv_str= ' '.join(conv)
@@ -453,6 +457,29 @@ def process_image_with_gpt4o(image_path,user_input2,text_from_image):
     return response.json()
 
 
+def read_files_from_folder():
+    folder_path = Path('/home/yaniv/scripts-yaniv/chatwithGPT/gptchat/files/')
+    files_content = []
+    accepted_extensions = ['.txt', '.md', '.html', '.css', '.xml', '.pdf', '.xls', '.xlsx', '.csv', '.py', '']
+    
+    if not folder_path.exists():
+        print(f"The 'files' folder does not exist at {folder_path}")
+        return files_content
+
+    for file_path in folder_path.iterdir():
+        if file_path.is_file() and file_path.suffix.lower() in accepted_extensions:
+            try:
+                content = read_file(str(file_path))
+                if content:
+                    files_content.append({
+                        "name": file_path.name,
+                        "content": content
+                    })
+            except Exception as e:
+                print(f"Error reading file {file_path.name}: {e}")
+
+    return files_content
+
 read_history()
 uhistory, bhistory = process_conversation_log(conversation_log)
 #conv()
@@ -478,6 +505,20 @@ while True:
             if confirm.lower() == "y":
                 clear_files()
             continue
+
+        if ui.strip() == "/readfiles":
+                    print("Reading files from the 'files' folder...")
+                    files_content = read_files_from_folder()
+                    if files_content:
+                        print(f"Read {len(files_content)} files successfully.")
+                        file_text = "\n".join([f"File: {file['name']}\nContent: {file['content']}\n" for file in files_content])
+                        user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would you like to know about these files?: ' + Style.RESET_ALL).strip()
+                        ui = f"I've read the following files:\n{file_text}\nQuestion: {user_input2}"
+                        texttoadd = f"{timestamp} USER: {ui}"
+                    else:
+                        print("No files were read or the 'files' folder is empty.")
+                        continue
+
 
         if "/url" in ui:        
             url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
@@ -506,7 +547,8 @@ while True:
               #  ui=ui+ "\n\n  from now on all my questions reffering to this text of the file. first request from user: \n  " +user_input2
                 ui=f"read this file name: {file} question: {user_input2}"
                 texttoadd= f"{timestamp} USER: {ui}"  
-                      
+                    
+      
 
         # if "/image" in ui: 
         #     image_path=extract_filepic(ui)

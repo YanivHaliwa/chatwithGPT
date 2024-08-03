@@ -1,0 +1,50 @@
+#!/bin/bash
+
+cleanup() {
+    echo "Script interrupted. Exiting gracefully."
+    exit 1
+}
+
+# Set trap to catch SIGINT and call cleanup function
+trap cleanup SIGINT
+
+echo "where? all[/]  here[.]  else[specify] "
+read where
+
+echo "exact match?  yes[y]  no[n]  "
+read exact
+
+echo "file or folder only?  file[fi]  folder[fo] all[a]  "
+read type
+
+echo searching "$1" ,place: "$where", excat: "$exact", type: "$type" 
+
+if [ "$type" == "fi" ] && [ "$exact" == "y" ]
+then
+        find "$where"   -type f -name "$1" 2>/dev/null 
+fi
+
+if [ "$type" == "fi" ] && [ "$exact" == "n" ]
+then
+        find "$where"  -type f -iname "*$1*" 2>/dev/null 
+fi
+
+ if [ "$type" == "fo" ] && [ "$exact" == "y" ]
+then
+    find "$where"   -type d -name "$1" 2>/dev/null 
+fi
+
+if [ "$type" == "fo" ] && [ "$exact" == "n" ]
+then
+        find "$where"  -type d -iname "*$1*" 2>/dev/null 
+fi
+
+if [ "$type" == "a" ] && [ "$exact" == "y" ]
+then
+    find "$where" -name "$1" 2>/dev/null
+fi
+
+if [ "$type" == "a" ] && [ "$exact" == "n" ]
+then
+   find "$where" -iname "*$1*"  2>/dev/null
+fi

@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+import re
+import argparse
+import os
+import sys
+
+# Set up command line argument parser
+parser = argparse.ArgumentParser(description="Search for a word or pattern in a specific file.")
+parser.add_argument("file_path", help="The path to the file to search in.")
+parser.add_argument("search_term", help="The word or pattern to search for.")
+parser.add_argument("-p", "--pattern", action="store_true", help="Treat the search term as a regular expression pattern.")
+
+blue_color = "\033[94m"
+yellow_color = "\033[93m"
+reset_color = "\033[0m"
+
+# Parse command line arguments
+args = parser.parse_args()
+
+filel=args.file_path
+search=args.search_term
+
+def get_absolute_path(file_path):
+    if os.path.isabs(file_path):
+        return file_path
+    else:
+        current_directory = os.getcwd()
+        return os.path.join(current_directory, file_path)
+
+def escape_special_characters(pattern):
+    special_characters = r"[](){}.*+?|^$\\"
+    return "".join(f"\\{char}" if char in special_characters else char for char in pattern)
+
+filepath = get_absolute_path(filel)
+
+if not os.path.isfile(filepath):
+    print("file not exist")
+    sys.exit(1) 
+
+print("file: ",filepath)
+print("searching:  ",search)
+
+escaped_pattern = escape_special_characters(search)
+search = re.compile(escaped_pattern, re.IGNORECASE)
+ 
+x=0
+try:
+    with open(filepath, 'r') as file:     
+        for line_number, line in enumerate(file, start=1):
+            l = yellow_color + str(line_number) + reset_color  # Convert line_number to string
+            # If -p/--pattern is specified, use re.search
+            if args.pattern and re.search(search, line):
+                print(f"Found on line {l}: {blue_color+line+reset_color}")
+                x+=1
+            # Otherwise, check for an exact word match
+            elif not args.pattern and re.search(r'\b' + search.pattern.lower() + r'\b', line.lower()):
+                print(f"Found on line {l}: {blue_color+line+reset_color}")
+                x+=1
+        if x == 0:
+            print("No Result")
+        else:
+            print("Found",x,"Result")
+
+
+except KeyboardInterrupt:
+            print("Stop searching, quitting")
+            sys.exit(1)
+except:
+    pass

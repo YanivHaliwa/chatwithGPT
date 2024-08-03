@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+
+import sys
+from deep_translator import GoogleTranslator
+import cohere
+import anthropic
+import openai
+from openai import OpenAI
+import os
+
+
+client_oi = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+modelSource = "gpt-4o"
+
+co = cohere.Client('Yh39FGH2X2zv1nk2oXxvF4s4ibPuqXlLf2exerqT')
+modelco= 'command-nightly'
+
+client_an = anthropic.Anthropic()
+model = "claude-3-opus-20240229"
+
+
+translator = GoogleTranslator(source='en', target='iw')
+input_text = ' '.join(sys.argv[1:])  # Join all command-line arguments after the script name
+
+try:
+    result = translator.translate(input_text)
+    if result:
+        print("google translator:\n",result)
+    else:
+        print("Translation failed. No text returned.")
+except Exception as e:
+    print("Translation failed. Error:", str(e))
+
+
+try:
+    text=""
+    token_count=0
+    for event in co.chat_stream(
+            model=modelco,
+            message="translate this to hebrew: "+input_text,
+            temperature=0.7,
+            preamble="""you are transaltor expert in english and hebrew. 
+            you going to translate from english to hebrew.
+            your respond should be only the translate nothing else.
+            i need you to think on the context from user not just colde translate. 
+            i also need you figure sland of people . dont just transalte words but think how they use it and that translte. 
+              """
+        ):
+
+        if event.event_type == "text-generation":
+            response_tokens = len(event.text.split())  # Estimate token count
+            token_count += response_tokens
+            text+=event.text
+        elif event.event_type == "stream-end":
+            break
+    
+    print("cohere ai translate:")
+    print(" "+text, end='', flush=True)  # Print each piece on the same line
+    print("")
+except Exception as e:
+    pass
+    #print("Translation failed. Error:", str(e))
+
+
+try: 
+    text=""  
+    with client_an.messages.stream(
+        model=model,
+        max_tokens=4000,
+        system=f"""
+             you are transaltor expert in english and hebrew. 
+             you going to translate from english to hebrew.
+             your respond should be only the translate nothing else.
+             i need you to think on the context from user not just colde translate. 
+             i also need you figure sland of people . dont just transalte words but think how they use it and that translte.         
+        """,
+         messages=[
+            {
+                "role": "user", 
+                "content": "translate this to hebrew: "+input_text,
+            },
+            
+        ],
+         temperature=0.9
+        ) as stream:
+            for te in stream.text_stream:
+                text+=te
+        
+    print("claude translate:")
+    print(text, end='', flush=True)
+    print("")
+except Exception as e:
+ pass
+
+try:
+    text=""
+    response = client_oi.chat.completions.create(
+    model=modelSource,
+    messages=[
+        {
+            'role': 'system',
+            'content': f"""
+             you are transaltor expert in english and hebrew. 
+             you going to translate from english to hebrew.
+             your respond should be only the translate nothing else.
+             i need you to think on the context from user not just colde translate. 
+             i also need you figure sland of people . dont just transalte words but think how they use it and that translte.         
+        """
+        },
+        
+        {
+            "role": "user", 
+            "content":"translate this to hebrew: "+input_text
+        },
+        
+    ],
+    stream=True,
+    temperature=1,
+    max_tokens=3000
+    )
+    # temptext = response.choices[0].delta.content
+    # print(response)
+    for chunk in response:
+        if chunk.choices[0].delta.content is not None:  
+            temptext = chunk.choices[0].delta.content
+            text+=temptext
+    print("chatgpt translate:")
+    print(" "+text,end="",flush=True)      
+    print("")
+
+except Exception as e:
+    pass
+#     print("Translation failed. Error:", str(e))

@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Check if exactly two arguments are provided
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <directory> <search_term>"
+    exit 1
+fi
+
+# Extract arguments
+directory=$1
+search_term=$2
+
+# Debug: Print the initial value of directory
+echo "Initial directory: $directory"
+
+# Convert relative path to an absolute path
+if [[ "$directory" != /* ]]; then
+    directory="$(pwd)/$directory"
+fi
+
+# Check if the directory exists
+if [ ! -d "$directory" ]; then
+    echo "Error: Directory $directory not found."
+    exit 1
+fi
+
+# Normalize the path to remove any symlinks or relative path components
+directory=$(cd "$directory" && pwd)
+
+# Remove trailing slash if any, to prevent double slashes when constructing regex
+directory=${directory%/}
+
+# Construct the locate command
+locate_command="plocate -r '^$directory/.*$search_term.*$'"
+echo "Running command: $locate_command"
+echo ""
+
+# Run the locate command and format output with bold and red color
+eval $locate_command | while read line; do
+    echo -e "\e[1;32m$line\e[0m"
+done

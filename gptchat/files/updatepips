@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Define the output file for the list of installed packages
+temp_file="$HOME/pip_packages.txt"
+
+# List all installed packages and save to the output file
+pip3 list --format=freeze > "$temp_file"
+
+# Clean package names (remove versions)
+sed 's/==.*//' "$temp_file" > "$HOME/cleaned_package_names.txt"
+output_file="$HOME/cleaned_package_names.txt"
+error_log="$HOME/failed_packages.txt"
+final_error_log="$HOME/unresolved_packages.txt"
+
+# Clear previous error logs
+> "$error_log"
+> "$final_error_log"
+
+# Function to upgrade a package and log errors
+upgrade_package() {
+    package_name="$1"
+    if ! pip3 install --upgrade "$package_name"; then
+        echo "$package_name" >> "$error_log"
+    fi
+}
+
+# Function to retry upgrading packages in the error log
+retry_failed_packages() {
+    while IFS= read -r package_name; do
+        if ! pip3 install --upgrade "$package_name"; then
+            echo "$package_name" >> "$final_error_log"
+        fi
+    done < "$error_log"
+}
+
+# Read the output file line by line and upgrade each package
+while IFS= read -r package_name; do
+    upgrade_package "$package_name"
+done < "$output_file"
+
+# Retry upgrading packages that failed in the first attempt
+if [[ -s "$error_log" ]]; then
+    mv "$error_log" "$error_log.retry"
+    > "$error_log"  # Clear the error log for the retry pass
+    retry_failed_packages < "$error_log.retry"
+fi
+
+# Clean up temporary files
+rm -f "$temp_file" "$output_file"
+
+echo "All packages have been processed. Check $final_error_log for any unresolved errors."

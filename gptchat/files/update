@@ -1,0 +1,39 @@
+#!/bin/bash
+echo "KILL"
+echo "314674" | sudo -S  killall -SIGKILL  apt
+sudo  killall -SIGKILL  apt-get
+echo ""
+echo "UPDATE-SUGGEST"
+sudo  apt-get install --install-suggests 
+echo ""
+echo "UPDATE-RECOMMEND"
+sudo apt-get install --install-recommends
+echo ""
+echo "UPDATE"
+sudo  apt-get update 
+echo ""
+echo "UPGRADE"
+sudo  apt-get upgrade 
+echo ""
+echo "DIST-UPGRADE"
+sudo  apt-get dist-upgrade 
+echo ""
+echo "FULL-UPGRADE"
+sudo  apt-get full-upgrade 
+echo ""
+echo "FULL-NEWPACK"
+sudo  apt-get upgrade --with-new-pkgs
+echo ""
+echo "FIX-BROKEN"
+sudo apt --fix-broken install
+echo ""
+echo ""INSTALL -F""
+sudo apt install -f
+echo ""
+echo "CHECK"
+sudo apt-get check
+echo ""
+echo "FINISH UPDATE"
+echo ""
+clean
+

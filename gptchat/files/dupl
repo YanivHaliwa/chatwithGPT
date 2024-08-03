@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Ensure a file argument is provided
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 filename"
+  exit 1
+fi
+
+input_file="$1"
+
+# Create temporary files
+sorted_file=$(mktemp)
+duplicated_file=$(mktemp)
+unique_file=$(mktemp)
+
+# Sort the input file and find duplicates
+sort "$input_file" > "$sorted_file"
+uniq -d "$sorted_file" > "$duplicated_file"
+
+# Combine duplicates and unique lines
+grep -v -F -x -f "$duplicated_file" "$sorted_file" > "$unique_file"
+cat "$duplicated_file" >> "$unique_file"
+
+# Sort the final unique file
+sort "$unique_file" -o "$unique_file"
+
+# Move the final result to the output file
+mv "$unique_file" uniq.txt
+
+# Remove temporary files
+rm "$sorted_file" "$duplicated_file"
+
+echo "Done. Check file uniq.txt"

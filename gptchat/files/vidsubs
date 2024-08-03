@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+import os
+import sys
+from guessit import guessit
+
+def match_videos_to_subtitles(folder_path):
+    video_files = []
+    subtitle_files = []
+    video_extensions = ['.mp4', '.avi', '.mkv', '.ts']
+
+    for file in os.listdir(folder_path):
+        full_path = os.path.join(folder_path, file)
+        if any(file.endswith(ext) for ext in video_extensions):
+            video_files.append(full_path)
+        elif file.endswith('.srt'):
+            subtitle_files.append(full_path)
+
+    subtitle_metadata = {}
+    for srt in subtitle_files:
+        metadata = guessit(srt)
+        season = metadata.get('season')
+        episode = metadata.get('episode')
+        if isinstance(episode, list):
+            episode_key = "-".join([f"e{ep:02d}" for ep in episode])
+        else:
+            episode_key = f"e{episode:02d}"
+        key = f"s{season:02d}{episode_key}"
+        
+        if key not in subtitle_metadata:
+            subtitle_metadata[key] = []
+        subtitle_metadata[key].append(srt)
+
+    # Check for duplicate subtitles and ask user for preference
+    for key, subs in subtitle_metadata.items():
+        if len(subs) > 1:
+            heb_subs = [s for s in subs if '.he.' in s.lower() or '.heb.' in s.lower()]
+            eng_subs = [s for s in subs if s not in heb_subs]
+            
+            if heb_subs and eng_subs:
+                print(f"Found both Hebrew and English subtitles for {key}:")
+                print("Hebrew:", ", ".join(heb_subs))
+                print("English:", ", ".join(eng_subs))
+                choice = input("Do you want to delete the English subtitles? (y/n): ").lower()
+                if choice == 'y':
+                    for eng_sub in eng_subs:
+                        os.remove(eng_sub)
+                        print(f"Deleted: {eng_sub}")
+                    subtitle_metadata[key] = heb_subs
+
+    # Rename video files to match the subtitle files
+    for video in video_files:
+        metadata = guessit(video)
+        season = metadata.get('season')
+        episode = metadata.get('episode')
+        if isinstance(episode, list):
+            episode_key = "-".join([f"e{ep:02d}" for ep in episode])
+        else:
+            episode_key = f"e{episode:02d}"
+        key = f"s{season:02d}{episode_key}"
+
+        if key in subtitle_metadata:
+            srt_filename = subtitle_metadata[key][0]  # Use the first (or only) subtitle file
+            new_video_filename = os.path.splitext(srt_filename)[0] + os.path.splitext(video)[1]
+            if video != new_video_filename:
+                os.rename(video, new_video_filename)
+                print(f"Renamed '{video}' to '{new_video_filename}'")
+        else:
+            print("No matching subtitle file found for", video)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        match_videos_to_subtitles(sys.argv[1])
+        print("Processing completed.")
+    else:
+        print("Please provide the path to the folder containing the videos and subtitles.")

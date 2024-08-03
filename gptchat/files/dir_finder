@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+
+import sys
+import asyncio
+import aiohttp
+import warnings
+from asyncio import Queue
+import shutil
+from aiohttp import ClientSession, TCPConnector
+import subprocess
+import argparse
+
+#focus on folders only -// another app for pages
+ 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+queue = Queue()
+
+if len(sys.argv) < 3:
+    print("Usage: script.py wordlist domain")
+    sys.exit(1)
+
+parser = argparse.ArgumentParser(description="A script with positional arguments and an optional thread count")
+
+parser.add_argument('wordlist', type=str, help="The wordlist to use")
+parser.add_argument('domain', type=str, help="The domain to target")
+parser.add_argument('-t', '--threads', type=int, default=10, help="Count of threads to use (default: 1)")
+
+args = parser.parse_args()
+tr=args.threads
+wordlist=args.wordlist
+domain=args.domain
+domain = args.domain.replace("http:", "").replace("https:", "").strip("/")
+
+print(f"\nWordlist: {wordlist}")
+print(f"Domain: {domain}")
+print(f"Using {tr} threads.\n")
+
+
+valid_d = []
+valid_f =[]
+
+print("preparing...")
+
+sem = asyncio.Semaphore(tr)  # Adjust the value as necessary
+
+
+
+def get_line_count(filepath):
+    try:
+        output = subprocess.check_output(["wc", "-l", filepath])
+        line_count = int(output.split()[0])
+        return line_count
+    except Exception as e:
+        print(f"Could not get line count due to: {str(e)}")
+        return 0
+
+sum_line_wordlist = get_line_count(wordlist)
+count_lines=0
+
+print ("done count file\n")
+
+
+
+async def check_directory(directory, domain, session):
+    global count_lines
+    async with sem:
+        count_lines += 1
+         
+        try:
+            # Try https first
+            check_url = f"https://{domain}/{directory.strip()}/"
+            async with session.get(check_url + "/", timeout=10) as response:
+                if response.status != 404:
+                    valid_d.append(check_url + "/")
+                    await queue.put(f"Valid: {check_url}")
+                else:
+                   pass 
+        except:
+           # print(f"Exception in check_directory: {e}")
+            try:
+                check_url = f"http://{domain}/{directory.strip()}/"
+                async with session.get(check_url + "/", timeout=10) as response:
+                    if response.status != 404:
+                        valid_d.append(check_url + "/")
+                        await queue.put(f"Valid: {check_url}")
+            except Exception as e:
+             pass
+            #    print(f"Exception in check_directory: {e}")
+
+        finally:
+            await queue.put(f"Progress: {count_lines} / {sum_line_wordlist}")
+
+ 
+async def monitor_queue():
+    last_progress_message = ""
+    while True:
+        try:
+            message = queue.get_nowait()
+        except asyncio.QueueEmpty:
+            message = None
+        
+        terminal_width = shutil.get_terminal_size((80, 20)).columns
+        
+        if message:
+            truncated_message = message[:terminal_width - 1]
+            
+            if message.startswith("Progress:"):
+                last_progress_message = truncated_message
+            else:
+                sys.stdout.write("\r" + " " * terminal_width + "\r")  # Clear the current line
+                sys.stdout.write(f"\r{truncated_message}\n\r")  # Print the truncated message and a new line
+        
+        sys.stdout.write("\r" + " " * terminal_width + "\r")  # Clear the current line
+        sys.stdout.write(f"\r{last_progress_message}\r")  # Print the last progress message
+        
+        sys.stdout.flush()
+        await asyncio.sleep(0.1)  # Adjust this value to control the update frequency
+
+
+async def create_tasks(domain, filepath, session):
+   # print ("start create task")
+    try:
+        with open(filepath, encoding='utf-8', errors='ignore') as file:
+            for line in file:
+                directory = line.strip()  # Remove whitespace from both ends of the string
+                if directory and not directory.startswith("#") and not " " in directory and not directory.startswith("/"):
+                    yield asyncio.create_task(check_directory(directory, domain, session))
+    except Exception as e:
+        #print(f"Exception: {e}")
+        pass
+ 
+
+ 
+async def main(domain, filepath):
+   # print ("start main")
+
+    try:  
+        monitor_task = asyncio.create_task(monitor_queue())
+        async with ClientSession(connector=TCPConnector(limit=tr)) as session:
+            
+            tasks = []
+            async for task in create_tasks(domain, filepath, session):
+                tasks.append(task)
+                if len(tasks) >= tr :  # Adjust batch size as necessary
+                    await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                    tasks = [t for t in tasks if not t.done()]
+
+            # if tasks:
+            #     await asyncio.gather(*tasks)
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+
+            monitor_task.cancel()
+
+            if valid_d:
+                print("\033[1;32m\n\nValid directories:\033[0m")
+                with open('valid_directories.txt', 'a') as f:
+                    for val in valid_d:
+                        print(val)
+                        f.write(val + '\n')
+            else:
+                print("Looks like no directory found")
+    except Exception as e:
+       # print(f"Exception: {e}")
+       pass
+
+ 
+try:
+    asyncio.run(main(domain, wordlist))  # Adjusted the call to asyncio.run
+except KeyboardInterrupt:
+    print("\nScript interrupted by user. Exiting...")
+    sys.exit(0)

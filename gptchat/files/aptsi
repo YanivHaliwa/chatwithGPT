@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Check if an argument is provided
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 [-m] <search_term>"
+    exit 1
+fi
+
+# Initialize variables
+manual_flag=false
+search_term=""
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m)
+            manual_flag=true
+            shift
+            ;;
+        *)
+            search_term="$1"
+            shift
+            ;;
+    esac
+done
+
+# Check if search term is provided
+if [ -z "$search_term" ]; then
+    echo "Error: No search term provided"
+    echo "Usage: $0 [-m] <search_term>"
+    exit 1
+fi
+
+# Perform the search based on the flag
+if [ "$manual_flag" = true ]; then
+    # Get list of all manually installed packages
+    manual_packages=$(apt-mark showmanual)
+    
+    # Use a single apt list command and filter the results
+    apt list --installed 2>/dev/null | grep -v "Listing..." | grep "$search_term" | 
+    while IFS= read -r line; do
+        package_name=$(echo "$line" | cut -d'/' -f1)
+        if echo "$manual_packages" | grep -q "^$package_name$"; then
+            echo "$line"
+        fi
+    done
+else
+    apt list --installed 2>/dev/null | grep -v "Listing..." | grep "$search_term"
+fi

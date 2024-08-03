@@ -1,0 +1,402 @@
+#!/usr/bin/env python3
+
+import base64
+import urllib.parse
+import sys
+from termcolor import colored
+import binascii
+import quopri
+from html import unescape
+import json
+import zlib
+import os
+import argparse
+import jwt
+import hashlib
+import zlib
+from Crypto.Hash import MD4
+import crcmod
+  
+alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+def encode_base58(text):
+    n = int.from_bytes(text.encode(), 'big')
+    res = []
+    while n > 0:
+        n, r = divmod(n, 58)
+        res.append(alphabet[r])
+    res = ''.join(res[::-1])
+    return res
+
+# Morse Code encoding
+morse_code_dict = { 'A':'.-', 'B':'-...',
+                    'C':'-.-.', 'D':'-..', 'E':'.',
+                    'F':'..-.', 'G':'--.', 'H':'....',
+                    'I':'..', 'J':'.---', 'K':'-.-',
+                    'L':'.-..', 'M':'--', 'N':'-.',
+                    'O':'---', 'P':'.--.', 'Q':'--.-',
+                    'R':'.-.', 'S':'...', 'T':'-',
+                    'U':'..-', 'V':'...-', 'W':'.--',
+                    'X':'-..-', 'Y':'-.--', 'Z':'--..'}
+
+def encode_morse_code(text):
+    return ' '.join(morse_code_dict.get(c.upper(), '') for c in text)
+
+def encode_jwt(text):
+    encoded_jwt = jwt.encode({"some": text}, "secret", algorithm="HS256")
+    return encoded_jwt
+
+def encode_md4(text):
+    h = MD4.new()
+    h.update(text.encode())
+    return h.hexdigest()
+     
+def encode_md5(text):
+    m = hashlib.md5()
+    m.update(text.encode())
+    return m.hexdigest()
+
+def encode_sha1(text):
+    m = hashlib.sha1()
+    m.update(text.encode())
+    return m.hexdigest()
+
+def encode_sha256(text):
+    m = hashlib.sha256()
+    m.update(text.encode())
+    return m.hexdigest()
+
+def encode_sha384(text):
+    m = hashlib.sha384()
+    m.update(text.encode())
+    return m.hexdigest()
+
+def encode_sha512(text):
+    m = hashlib.sha512()
+    m.update(text.encode())
+    return m.hexdigest()
+
+def encode_crc32(text):
+    return format(zlib.crc32(text.encode()), 'x')
+
+# Function to encode ASCII text
+def encode_ascii(text):
+    return ' '.join(str(ord(c)) for c in text)
+
+# Function to encode text to Octal
+def encode_octal(text):
+    return ' '.join(oct(ord(c)) for c in text)
+
+# Function to encode text to Binary
+def encode_binary(text):
+    return ' '.join(format(ord(c), 'b') for c in text)
+
+# Function to encode text to Hexadecimal
+def encode_hex(text):
+    return ' '.join(hex(ord(c)) for c in text)
+
+# Function to encode text to Hex dump
+def encode_hexdump(text):
+    hex_values = ['{:02x}'.format(ord(c)) for c in text]
+    return ' '.join(hex_values)
+
+# Function to encode text to Decimal
+def encode_decimal(text):
+    return ' '.join(str(ord(c)) for c in text)
+
+# Function to encode text to Base16
+def encode_base16(text):
+    return base64.b16encode(text.encode()).decode()
+
+# Function to encode text to Base32
+def encode_base32(text):
+    return base64.b32encode(text.encode()).decode()
+
+# Function to encode text to Base64
+def encode_base64(text):
+    return base64.b64encode(text.encode()).decode()
+
+def safe_latin1_encode(s):
+    return s.encode('LATIN1', 'replace')
+
+# Function to encode text to Base85
+def encode_base85(text):
+    try:
+        encoded_text = base64.a85encode(safe_latin1_encode(text_to_encode)).decode()
+        return encoded_text
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    #return base64.a85encode(text.encode('LATIN1')).decode()
+ 
+# Function to encode text to URL Encoding
+def encode_url(text):
+    return urllib.parse.quote(text)
+
+# Function to encode text to ROT47
+def encode_rot47(text):
+    return ''.join([chr(33 + ((ord(c) - 33 + 47) % 94)) for c in text])
+
+# Function to encode text to Caesar Cipher (All 26 shifts)
+def encode_caesar_all_shifts(text):
+    result = {}
+    for i in range(26):
+        result[f'shift_{i}'] = ''.join([chr(((ord(c) - 65 + i) % 26) + 65) for c in text.upper()])
+    return result
+
+def encode_uu(text):
+    encoded = []
+    text_bytes = text.encode()
+    for i in range(0, len(text_bytes), 45):
+        chunk = text_bytes[i:i+45]
+        encoded.append(binascii.b2a_uu(chunk).decode())
+    return ''.join(encoded)
+     
+# Function to encode text to Quoted-Printable
+def encode_quopri(text):
+    return quopri.encodestring(text.encode()).decode()
+
+def encode_punycode(text):
+    try:
+        return text.encode('punycode').decode()
+    except Exception as e:
+        return None
+ 
+# Function to encode text to Zlib Compression
+def encode_zlib(text):
+    return base64.b64encode(zlib.compress(text.encode())).decode()
+
+def encode_atbash(text):
+    encoded = []
+    for c in text:
+        if c.isalpha():
+            if ord(c) < 128:  # Check if it's an ASCII character
+                if c.isupper():
+                    encoded.append(chr(90 - (ord(c) - 65)))
+                elif c.islower():
+                    encoded.append(chr(122 - (ord(c) - 97)))
+            else:
+                encoded.append(c)  # Append the character as is if it's not ASCII
+        else:
+            encoded.append(c)
+    return ''.join(encoded)
+
+def encode_crc32_standard(text):
+    crc32_func = crcmod.predefined.mkCrcFun('crc-32')
+    return format(crc32_func(text.encode()), 'x')
+
+def encode_whirlpool(text):
+    whirlpool = hashlib.new('whirlpool')
+    whirlpool.update(text.encode())
+    return whirlpool.hexdigest()
+
+
+def contains_alpha(s):
+
+    return any(c.isalpha() for c in s)
+
+
+     
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description=colored("This script encodes to the following formats:", "yellow") + " ASCII, Octal, Binary, Hexadecimal, Hex dump, Decimal, Base16, Base32, Base58, Base64, Base85, URL Encoding, ROT47, Caesar Cipher (All 26 shifts), Morse Code, UUencoding, Quoted-Printable, Punycode, JWT Tokens, Zlib Compression, Atbash Cipher, MD4, MD5, SHA-1, SHA-256, SHA-384, SHA-512, CRC32.")
+    parser.add_argument('-c','--basic', action='store_true', help='Include basic encodings: ASCII, Octal, Binary, Hexadecimal, Hex dump, and Decimal')    
+    parser.add_argument('-b','--base', action='store_true', help='Include Base encodings: Base16, Base32, Base58, Base64, Base85')
+    parser.add_argument('-s','--hash', action='store_true', help='Include Hash encodings:  MD4, MD5, SHA-1, SHA-256, SHA-384, SHA-512, CRC32')
+    parser.add_argument('-d','--advanced', action='store_true', help='Include advanced encodings: URL Encoding, ROT47, Caesar Cipher, UUencoding, Quoted-Printable, Punycode, Zlib Compression, Atbash Cipher, Morse Code, and JWT Tokens.')   
+    parser.add_argument('-a','--all', action='store_true', help='Include all types of encodings')
+    parser.add_argument("file_path", help="Path to the file that needs to be encoded", nargs='?', default=None)
+    args = parser.parse_args()
+
+    try:
+        if args.file_path:
+            file_path = args.file_path
+            if file_path:
+                try:
+                    with open(file_path, 'r') as f:
+                        text_to_encode = f.read().strip()
+                except FileNotFoundError:
+                        print(colored("File not found", "red"))
+                        sys.exit(1)
+                except:
+                    sys.exit(1)
+        else:   
+            text_to_encode = input("Please enter a string: ").strip()
+    except KeyboardInterrupt:
+        print("\rexiting..\033[K\n", end='', flush=True)
+        sys.exit(0)
+
+    os.system('clear')
+
+    print("\n" + colored("Input String:", "magenta"))
+    print(colored(text_to_encode,"blue"))
+    
+    chars=contains_alpha(text_to_encode)
+    if not chars: 
+        print ("attention: none charcaters")
+
+    argu = len(sys.argv)
+    if args.file_path: 
+        argu -= 1  # Reduce the count by 1 if a file path is provided
+
+    if argu <= 1:
+        args.base = True
+        args.hash = True
+
+    if args.basic or args.all:
+        eascii=encode_ascii(text_to_encode)
+        if eascii and  eascii!=text_to_encode:
+            print("\nASCII:")
+            print(colored(eascii, 'yellow'))
+     
+        eoctal = encode_octal(text_to_encode)
+        if eoctal and eoctal != text_to_encode:
+            print("\nOctal:")
+            print(colored(eoctal, 'yellow'))
+
+        ebinary = encode_binary(text_to_encode)
+        if ebinary and ebinary != text_to_encode:
+            print("\nBinary:")
+            print(colored(ebinary, 'yellow'))
+
+        ehex = encode_hex(text_to_encode)
+        if ehex.strip() and ehex != text_to_encode:
+            print("\nHexadecimal:")
+            print(colored(ehex, 'yellow'))
+
+        ehexdump = encode_hexdump(text_to_encode)
+        if ehexdump.strip() and ehexdump != text_to_encode:
+            print("\nHex dump:")
+            print(colored(ehexdump, 'yellow'))
+
+        edecimal = encode_decimal(text_to_encode)
+        if edecimal and edecimal != text_to_encode:
+            print("\nDecimal:")
+            print(colored(edecimal, 'yellow'))
+
+    if args.base or args.all:
+        ebase16 = encode_base16(text_to_encode)
+        if ebase16 and ebase16 != text_to_encode:
+            print("\nBase16:")
+            print(colored(ebase16, 'yellow'))
+
+        ebase32 = encode_base32(text_to_encode)
+        if ebase32 and ebase32 != text_to_encode:
+            print("\nBase32:")
+            print(colored(ebase32, 'yellow'))
+
+        ebase58 = encode_base58(text_to_encode)
+        if ebase58 and ebase58 != text_to_encode:
+            print("\nBase58:")
+            print(colored(ebase58, 'yellow'))
+
+        ebase64 = encode_base64(text_to_encode)
+        if ebase64 and ebase64 != text_to_encode:
+            print("\nBase64:")
+            print(colored(ebase64, 'yellow'))
+
+        ebase85 = encode_base85(text_to_encode)
+        if ebase85 and ebase85 != text_to_encode:
+            print("\nBase85:")
+            print(colored(ebase85, 'yellow'))
+        
+    if args.hash or args.all:
+        emd4 = encode_md4(text_to_encode)
+        if emd4 and emd4 != text_to_encode:
+            print("\nMD4:")
+            print(colored(emd4, 'yellow'))
+
+        emd5 = encode_md5(text_to_encode)
+        if emd5 and emd5 != text_to_encode:
+            print("\nMD5:")
+            print(colored(emd5, 'yellow'))
+
+        esha1 = encode_sha1(text_to_encode)
+        if esha1 and esha1 != text_to_encode:
+            print("\nSHA-1:")
+            print(colored(esha1, 'yellow'))
+
+        esha256 = encode_sha256(text_to_encode)
+        if esha256 and esha256 != text_to_encode:
+            print("\nSHA-256:")
+            print(colored(esha256, 'yellow'))
+
+        esha384 = encode_sha384(text_to_encode)
+        if esha384 and esha384 != text_to_encode:
+            print("\nSHA-384:")
+            print(colored(esha384, 'yellow'))
+
+        esha512 = encode_sha512(text_to_encode)
+        if esha512 and esha512 != text_to_encode:
+            print("\nSHA-512:")
+            print(colored(esha512, 'yellow'))
+
+        ecrc32b = encode_crc32(text_to_encode)
+        if ecrc32b and ecrc32b != text_to_encode:
+            print("\nCRC32-B:")
+            print(colored(ecrc32b, 'yellow'))
+
+        ecrc32 = encode_crc32_standard(text_to_encode)
+        if ecrc32 and ecrc32 != text_to_encode:
+            print("\nCRC32-standard:")
+            print(colored(ecrc32, 'yellow'))
+
+        ewhirlpool = encode_whirlpool(text_to_encode)
+        if ewhirlpool and ewhirlpool != text_to_encode:
+            print("\nWhirlpool:")
+            print(colored(ewhirlpool, 'yellow'))
+
+           
+    if args.advanced or args.all:   
+        eurl = encode_url(text_to_encode)
+        if eurl and eurl != text_to_encode:
+            print("\nURL Encoding:")
+            print(colored(eurl, 'yellow'))
+
+        erot47 = encode_rot47(text_to_encode)
+        if erot47 and erot47 != text_to_encode:
+            print("\nROT47:")
+            print(colored(erot47, 'yellow'))
+
+        ecaesar = encode_caesar_all_shifts(text_to_encode)
+        if ecaesar:
+            print("\n" + colored("Caesar Cipher (All 26 shifts):", "blue"))
+            ecaesar_str = ', '.join([f"{colored(val, 'yellow')} (shift {key.split('_')[1]})" for key, val in ecaesar.items()])
+            print(ecaesar_str)
+
+        euu = encode_uu(text_to_encode)
+        if euu.strip() and euu != text_to_encode:
+            print("\nUUencoding:")
+            print(colored(euu, 'yellow'))
+
+        equopri = encode_quopri(text_to_encode)
+        if equopri and equopri != text_to_encode:
+            print("\nQuoted-Printable:")
+            print(colored(equopri, 'yellow'))
+
+        epunycode = encode_punycode(text_to_encode)
+        if epunycode and epunycode != text_to_encode:
+            print("\nPunycode:")
+            print(colored(epunycode, 'yellow'))
+
+        ezlib = encode_zlib(text_to_encode)
+        if ezlib and ezlib != text_to_encode:
+            print("\nZlib Compression:")
+            print(colored(ezlib, 'yellow'))
+
+        eatbash = encode_atbash(text_to_encode)
+        if eatbash and eatbash != text_to_encode:
+            print("\nAtbash Cipher:")
+            print(colored(eatbash, 'yellow'))
+
+        emorse = encode_morse_code(text_to_encode)
+        if emorse.strip() and emorse != text_to_encode:
+            print("\nMorse Code:")
+            print(colored(emorse, 'yellow'))
+           
+
+        ejwt = encode_jwt(text_to_encode)
+        if ejwt and ejwt != text_to_encode:
+            print("\nJWT:")
+            print(colored(ejwt, 'yellow'))
+ 

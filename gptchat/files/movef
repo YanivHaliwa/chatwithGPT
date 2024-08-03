@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Help instructions
+function show_help() {
+    echo "Usage: $0 [source_directory] [destination_directory]"
+    echo "This script moves all files from the source subdirectories to the destination directory."
+    echo "It will ask for confirmation before deleting all subdirectories, regardless of their contents."
+    echo "Files with the same name will be renamed by appending the last folder name to avoid overwriting."
+}
+
+# Check if the correct number of arguments is given
+if [ "$#" -ne 2 ]; then
+    show_help
+    exit 1
+fi
+
+# Assign arguments to variables and get absolute paths
+source_dir=$(realpath "$1")
+dest_dir=$(realpath "$2")
+
+# Validate source and destination directories
+if [ ! -d "$source_dir" ]; then
+    echo "Error: Source directory '$source_dir' does not exist."
+    exit 1
+fi
+
+if [ ! -d "$dest_dir" ]; then
+    echo "Error: Destination directory '$dest_dir' does not exist."
+    exit 1
+fi
+
+# Temporary file for storing file paths and directories
+temp_file=$(mktemp)
+temp_dir_file=$(mktemp)
+
+# Find and store all files from subdirectories
+find "$source_dir" -mindepth 2 -type f > "$temp_file"
+# Store all subdirectories that have been operated on
+find "$source_dir" -mindepth 1 -type d > "$temp_dir_file"
+
+# Move files, renaming by appending last directory name to avoid overwrites
+while IFS= read -r file; do
+    base_name=$(basename -- "$file")
+    parent_dir=$(basename -- "$(dirname -- "$file")")
+    new_base_name="${base_name%.*}_${parent_dir}.${base_name##*.}"
+    dest_path="$dest_dir/$new_base_name"
+    
+    # Ensure the new file name does not create an overwrite issue
+    counter=1
+    while [ -e "$dest_path" ]; do
+        dest_path="${dest_dir}/${base_name%.*}_${parent_dir}_$counter.${base_name##*.}"
+        ((counter++))
+    done
+
+    mv "$file" "$dest_path"
+done < "$temp_file"
+
+# Ask if the user wants to delete subdirectories
+if [ -s "$temp_dir_file" ]; then
+    echo "Subdirectories found within the source directory:"
+    cat "$temp_dir_file"
+    read -p "operation complete. Do you want to delete all listed subdirectories? Warning: This includes non-empty directories. (y/n): " choice < /dev/tty
+    if [[ $choice == [yY] ]]; then
+        while IFS= read -r dir; do
+            rm -r "$dir"
+           # echo "Deleted directory: $dir"
+        done < "$temp_dir_file"
+    else
+        echo "No directories were deleted."
+    fi
+fi
+
+# Cleanup
+rm "$temp_file"
+rm "$temp_dir_file"
+
+echo "done."

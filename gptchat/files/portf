@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+ 
+import sys
+import socket
+from threading import Thread, Lock
+import requests
+import logging
+from time import sleep
+from threading import Semaphore
+
+# # Setup logging
+# logging.basicConfig(level=logging.DEBUG, filename="port_finder.log")
+
+if len(sys.argv) < 2:
+    print("Usage: script.py IP/DOMAIN")
+    sys.exit(1)
+
+
+MAX_CONCURRENT_THREADS = 3000
+semaphore = Semaphore(MAX_CONCURRENT_THREADS)
+open_ports = []
+host = sys.argv[1]
+ports = range(1, 65536)
+ip = socket.gethostbyname(host)
+print("searching ports in IP: " + ip)
+
+lock = Lock()
+
+def check_web_service(ip, port):
+    try:
+        response = requests.get(f"http://{ip}:{port}", timeout=5)
+        if response.status_code == 200:
+            return " - Web service detected"
+    except requests.exceptions.RequestException:
+            return  " "
+
+
+def probe_port(ip, port, result=1):
+    with semaphore:
+        try: 
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+            sock.settimeout(2)
+            r = sock.connect_ex((ip, port))
+            if r == 0: 
+                with lock:
+                    current_open_ports.append(port)
+                    print(port, " open")
+                    #print(f"\033[1;32m{port}: Open\033[0m")
+                return result  # Exit early if the port is open, no need for retries
+            # else:
+            #     # Retry mechanism
+            #     for retry in range(2):
+            #         r = sock.connect_ex((ip, port))
+            #         if r == 0:
+            #             with lock:
+            #                 current_open_ports.append(port)
+            #             break  # Break out of the loop as soon as an open port is detected
+            #         else:
+            #             logging.info(f"Retry {retry+1} failed for port {port}")
+            sock.close() 
+        except Exception as e: 
+            logging.exception(f"Exception occurred while probing port {port}: {e}")
+    return result
+
+
+try: 
+    for i in range(1, 65536, 10000):  # Reduced the port range per batch to 1000
+        end = i + 9999
+        if end > 65535:
+            end = 65535
+        threads = []
+        current_open_ports = []
+        for port in range(i, end+1):
+            thread = Thread(target=probe_port, args=(ip, port))
+            threads.append(thread)
+            thread.start()
+         
+        for thread in threads:
+            thread.join()
+
+        open_ports.extend(current_open_ports)
+
+        if not current_open_ports:
+        #     print("\033[1;32m\n\nOpen Ports in this range are:\033[0m")
+        #     for p in sorted(current_open_ports):
+        #         print(p)
+        # else:
+            print("No open ports found in this range.")
+        if end < 65535:
+            cont = input("\nDo you want to continue scanning the next 10000 ports? (y/n): ").strip().lower()
+            if cont != 'y':
+                break
+except KeyboardInterrupt:
+    print("\nScript interrupted by user. Exiting...")
+    sys.exit(0)
+
+
+ 
+
+def find_service(port_get):
+    def get_all_ports():
+        all_ports = {}    
+        try:
+            with open('/usr/share/nmap/nmap-services', 'r') as f:
+                for line in f:
+                    if line.startswith("#"):
+                        continue
+                    
+                    parts = line.split()
+                    if len(parts) < 3:
+                        continue
+                    
+                    service, port, frequency = parts[0], parts[1], parts[2]
+                    port_number, protocol = port.split('/')
+                    if port_number not in all_ports:
+                        all_ports[port_number] = []
+                    all_ports[port_number].append((service, protocol, float(frequency)))
+        except FileNotFoundError:
+            print("nmap-services file not found. Please ensure nmap is installed and the file path is correct.")
+        
+        return all_ports
+
+    all_ports = get_all_ports()
+    
+    matching_services = all_ports.get(port_get, [])
+
+    if matching_services:
+        unique_services = set(service_details[0] for service_details in matching_services)
+        for service in unique_services:
+          #  print(f"Service: {service}, Port: {port_get}")
+            print(f"Port: {port_get}, Service: {service}", check_web_service(ip, port_get))
+
+
+ 
+   
+if open_ports: 
+  print("\033[1;35m\n\nFinal list of open ports:\033[0m")
+  op = sorted(set(open_ports))
+  for p in op:
+     find_service(str(p))
+     
+
+else: 
+  print("No open ports found.")
+
+

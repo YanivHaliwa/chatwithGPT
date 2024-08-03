@@ -1,0 +1,28 @@
+#!/bin/bash
+
+target=$1
+
+# Check if a target folder is provided
+if [ -z "$1" ]; then
+  echo "Usage: ./script target-folder"
+  exit 1
+fi
+
+# Find commands to locate specific files, including hidden ones
+find $target \( -type f -or -type d \) \( -name '.*save.txt' -or -name '*save.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.user.txt' -or -name 'user.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.root.txt' -or -name 'root.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*priv*.txt' -or -name '*priv*.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*pass*.txt' -or -name '*pass*.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*cred*.txt' -or -name '*cred*.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*cred*.ini' -or -name '*cred*.ini' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*cred*.xml' -or -name '*cred*.xml' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.wp-config.php' -or -name 'wp-config.php' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.master*.txt' -or -name 'master*.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.id_rsa' -or -name 'id_rsa' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.id_dsa' -or -name 'id_dsa' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.bash_history' -or -name 'bash_history' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.htpasswd' -or -name 'htpasswd' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.env' -or -name 'env' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*note*.txt' -or -name '*note*.txt' \) 2>/dev/null
+find $target \( -type f -or -type d \) \( -name '.*flag*.txt' -or -name '*flag*.txt' \) 2>/dev/null
