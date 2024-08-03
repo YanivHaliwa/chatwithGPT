@@ -40,7 +40,7 @@ help_text = (
     f"          Example:\n"
     f"          /read /path/to/your/file.txt\n\n"
     f"  {Fore.GREEN}/translate{Style.RESET_ALL} - only translate next words without any exaplaintion.\n\n"
-    f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n"
+    # f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n"
     f"  {Fore.GREEN}/readfiles{Style.RESET_ALL} - Read all supported files from the 'files' folder in the current directory.\n"
     f"          Supported file types are: txt, md, html, css, xml, pdf, xls, xlsx, csv, py.\n"
 )
