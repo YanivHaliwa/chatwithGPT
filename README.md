@@ -19,8 +19,8 @@ This repository contains a suite of powerful Python-based tools that leverage Op
 
 1. Clone the repository:
    ```
-   git clone [repository-url]
-   cd [repository-name]
+   git clone https://github.com/YanivHaliwa/chatwithGPT.git
+   cd chatwithGPT
    ```
 
 2. Install the required dependencies:
