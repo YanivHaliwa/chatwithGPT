@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+
+import os
+import textwrap
+import openai
+from openai import OpenAI
+import colorama
+from colorama import Fore, Style
+from urllib.parse import urlparse
+import re
+import requests
+from bs4 import BeautifulSoup
+import time
+import threading
+import sys
+from datetime import datetime, timedelta
+import subprocess
+import shlex
+
+#version 9.4
+
+colorama.init(autoreset=True)
+
+alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
+
+print(alert_message)
+
+help_text = (f"{Fore.CYAN}Usage:{Style.RESET_ALL} script_name.py [OPTION]\n\n" +
+             f"{Fore.YELLOW}A versatile script designed for using GPT to create, update, and execute Python code in real-time.{Style.RESET_ALL}\n\n" +
+             f"{Fore.CYAN}Options:{Style.RESET_ALL}\n" +
+             f"  {Fore.GREEN}/help{Style.RESET_ALL}           Show this help message and exit\n" +
+             f"  {Fore.GREEN}/run{Style.RESET_ALL}            Execute the last generated Python script, capturing its output\n" +
+             f"  {Fore.GREEN}/clear{Style.RESET_ALL}          Clear all records from the conversation and code output files\n" +
+             f"  {Fore.GREEN}/read <file>{Style.RESET_ALL}    Read and process the specified file's content\n" + 
+             f"  {Fore.GREEN}exit{Style.RESET_ALL}            to exit the script.\n")
+
+
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+modelSource = "gpt-4o"
+uhistory = []
+bhistory = []
+conversation_log =[]
+code_output_log =[]
+filename=""
+CHUNK_SIZE = 1024   
+filename=""
+code =""
+pip_installs=[]
+timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def execute_command():
+    global filename
+    print("\nrunning: "+ filename)
+    args = input("\nEnter arguments (or press enter for none): ").strip()
+    command = f"python3 {filename} {args} | tee code_output.txt"
+    os.system(command)   
+    print() 
+    with open("code_output.txt", "r") as file:
+        output = file.read()
+  
+    return output
+
+
+def process_conversation_log(conversation_log):
+    global uhistory,bhistory
+    conversation_log= ' '.join(conversation_log)
+    
+    current_message = ""
+    line=""
+    current_author = None   
+
+    for line in conversation_log.strip().split("\n"):
+        if line[:19].count(":") == 2:  
+            if current_author == "USER":
+                uhistory.append(current_message.strip())
+            elif current_author == "BOT":
+                bhistory.append(current_message.strip())
+
+            colon_space_index = line.find(": ") -4
+            current_message = line[colon_space_index:]
+            
+            current_author = "USER" if "USER:" in line else "BOT"
+        else:
+            current_message += " " + line
+
+    if current_author == "USER":
+        uhistory.append(current_message.strip())
+    elif current_author == "BOT":
+        bhistory.append(current_message.strip())
+
+    return uhistory, bhistory
+
+def save_code(code):
+    global filename
+    with open(filename, 'w') as file:
+        file.write(code)
+    print(f"\n\nCode saved to {filename}\n")
+
+
+def parse_gpt_response(response_text):
+    global pip_installs,code
+
+    name_match = re.search(r'name:\s*(.*)', response_text, re.IGNORECASE)
+    pip_match = re.search(r'pip install needed:\s*(.*)', response_text, re.IGNORECASE)
+    code_match = re.search(r'code:\s*(.*)', response_text, re.IGNORECASE | re.DOTALL)
+
+    name = name_match.group(1).strip() if name_match else "generated_code"
+    pip_installs = pip_match.group(1).strip().split(', ') if pip_match else []
+    code = code_match.group(1).strip() if code_match else ""
+
+    return name, pip_installs, code
+
+
+def get_bot_response(uinput):
+    global temptext, uhistory, bhistory, conversation_log, code_output_log, pip_installs, code, filename
+    texttoadd=""
+    summary_string = ""
+    temptext = ""
+    try:
+        response = client.chat.completions.create(
+            model=modelSource,
+            messages=[
+               {
+            'role': 'system',
+            'content': '''
+            you must read and follow this orders precisely:
+            1. You are an expert in python code, i want you be expert on all libraries of python. you gonna respond to queries with concise code only. 
+            2. Provide direct code responses without explanations, text, context, code block markers, or language specifications. 
+            3. Your responses should consist solely of the code needed to fulfill the request, with no additional formatting or instructions.
+            5. DONT EVER USE placeholder and in your respond like "/path/to/" or "your script" or whatever 
+                 because as i said it gonna be run so your answer must be precise exact. 
+            6. if you dont know the location or name file - then add commands in the code to figure it out.
+            7. you going to read code and write code and update code epend on user need. until the full python code is complete.
+            8. every new code you write must be in begining '#!/usr/bin/env python3'
+            9. DONT EVER USE backticks and now quote!! not in begining not in the end. your code must be clear code excely.s 
+            10. the respond should be in this format only:
+                name: (here you put your generated name u think base on the code - i want you choose sharp short name)
+                pip install needed: (here you put suggestion if need to pip install library if its external)
+                code: (here you put your generated code)
+            11. your code should NOT be included library or code that require api - UNLESS user ask for it specific. your aim to find open source way to figure solution. 
+            12. you need to take in the count that that is not just example code its full real code. so you  need to make input output and function all full complete
+            13. DO NOT MAKE NEW NAME if you figure we still in same topic of code then you can and need to keep the same name as before without any change. until you figure from user that we talking on other project.
+            14. if i ask you to update code - you must stick to my order only. do not erase or delete code without permission you can only put in comment my code and add yours as you think. 
+            15. if i ask you to update code - and it simple to do it progrmatically i allow you to make new other python to handle the update progrmatically, 
+                example to change practicalr lines only or to replace word with another - in this example and similar you can find the way with ew python to find this lines or words and chnage them remotly by code.
+            16. i remind you that all further update on same project you need to make done on same file name so dont make up new name until its totaly new project
+            '''
+        },
+        {
+            'role': 'assistant',
+            'content': f'''
+                whenever i ask you to remember or recall something, i mean to this conversation: {conversation_log}
+                but you not limited to our conversation only you can answer question from your knowledge.
+                if i tell you to remember what you said before in conversation, i mean to this: {bhistory}
+                if i tell you to remember what user or me said,i mean this: {uhistory}
+                if have any error in the command you sent you should look for the last output of the code, you find it here {code_output_log}
+            '''
+        },
+    
+        {
+            "role": "user", 
+            "content": uinput
+        },
+            ],
+            stream=True,
+            temperature=1,
+            max_tokens=3000
+        )
+        summary=""
+        temptext=""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:  
+                temptext = chunk.choices[0].delta.content
+                summary+=temptext
+                print(Fore.GREEN+temptext+Style.RESET_ALL,end="",flush=True)             
+        summary_string = summary.strip()
+        texttoadd=f"{timestamp} BOT:\n{summary_string}\n"
+        conversation_log.append(texttoadd)
+        save_conversation(texttoadd)
+        filename=""
+        name, pip_installs, code = parse_gpt_response(summary_string)
+        filename = f"{name}.py"
+        save_code(code)
+       
+
+    except Exception as e:
+        error_message = str(e)
+        if "context length exceeded" in error_message or "code: 400" in error_message:
+            response="Detected token limit issue, lets start new conversation"
+            conversation_log= []
+        else:
+            print(f"An error occurred: {e}")
+    
+    except KeyboardInterrupt:
+        pass
+
+    return summary_string
+
+
+
+def read_history():
+    global conversation_log
+    line=""
+    if os.path.exists("conversation.txt"):
+        with open("conversation.txt", "r") as f:
+            lines = f.readlines()
+            if len(lines) > 500:
+                lines = lines[-500:]  
+            for line in lines:
+                conversation_log.append(line)
+
+
+def read_code_output():
+    global code_output_log
+    if os.path.exists("code_output.txt"):
+        with open("code_output.txt", "r") as f:
+            lines = f.readlines()
+            if len(lines) > 500:
+                lines = lines[-500:]   
+            for line in lines:
+                code_output_log.append(line)
+
+def clear_files():
+    conversation_log = []
+    with open("conversation.txt", "w") as file:
+        pass 
+    with open("code_output.txt", "w") as file:
+        pass  
+
+def save_conversation(textadd):
+    global conversation_log
+    with open("conversation.txt", "a") as f:
+        f.write(textadd + "\n") 
+   
+
+def conv():
+    global conversation_log,filename
+    texttoadd=""
+    while True:
+        try:
+            ui=""
+            user_input=""
+            user_input1=""
+            user_input2=""
+            user_input = input(Fore.BLUE + Style.BRIGHT + 'You: ' + Style.RESET_ALL).strip()
+            ui=user_input.lower()
+
+            if ui == "exit":
+                break
+            
+            if ui == "/help":
+                print(help_text)   
+                continue  
+
+            if ui == "/clear":
+                confirm=input("are you sure you want to delete all recoreds of conversation file and code output? y/n\n")
+                if confirm == "y":
+                    clear_files()
+                continue
+
+            if ui == "/run": 
+                conversation_str = "\n".join(conversation_log)
+                pattern = re.compile(r"name: (\w+)")
+                matches = pattern.findall(conversation_str)   
+                last_file_name = matches[-1] if matches else None
+                filename=last_file_name+".py"
+                output = execute_command()
+                code_output_log.append(f"file running: {filename}\n")
+                code_output_log.append(f"Output:\n{output}\n")
+                
+            if ui.startswith("/read "):    
+                clear_files()
+                file = ui[len("/read "):].strip()
+                try:
+                    with open(file, "r") as f:
+                        content = f.read()
+                except FileNotFoundError:
+                    print(f"File {file} not found.")
+                user_input1=content
+               # print(content)
+                user_input2=input(Fore.BLUE + Style.BRIGHT + 'what the request?: ' + Style.RESET_ALL).strip()
+                ui=user_input1+ "    -    " +user_input2
+                print (ui)
+
+            if ui!="/run" and ui!="/clear" :
+                texttoadd=f"{timestamp} USER: {ui}"
+                conversation_log.append(texttoadd)
+                save_conversation(texttoadd)
+                command = get_bot_response(ui).split()
+
+                if command:
+                    execute = input(Fore.YELLOW + "Run this code? (y/n): " + Style.RESET_ALL).strip().lower()
+                    if execute == 'y':
+                        print(Fore.CYAN + "Executing command..." + Style.RESET_ALL)
+                        output = execute_command()         
+                        code_output_log.append(f"file running: {filename}\n")
+                        code_output_log.append(f"Output:\n{output}\n")
+                    elif execute == 'n':
+                        print(Fore.RED + "code execution cancelled." + Style.RESET_ALL)
+                    else:
+                        print(Fore.RED + "Invalid input. code not executed." + Style.RESET_ALL)
+
+        except KeyboardInterrupt:
+            print("\n")   
+            try:
+                inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+                if inp.lower() == "y":
+                    print("Exiting...")
+                    break  
+                else:
+                    print("Resuming...")   
+            except KeyboardInterrupt:
+                print("\nMultiple interrupt signals received. Exiting...")
+                break   
+
+    
+ 
+uhistory, bhistory = process_conversation_log(conversation_log)
+read_history()
+read_code_output()
+try:
+        conv()
+except Exception as e:
+        print(f"An error occurred: {e}")
+                   
+print("Goodbye!")
+sys.exit(0)
+
+ 

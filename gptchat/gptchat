@@ -1,0 +1,562 @@
+#!/usr/bin/env python3
+
+import os,sys,base64,time,re,requests,threading,glob,mimetypes,pytesseract,subprocess,textwrap
+import openai
+from openai import OpenAI
+import colorama
+from colorama import Fore, Style
+from urllib.parse import urlparse
+from datetime import datetime, timedelta
+from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+from bs4 import BeautifulSoup
+from datetime import datetime
+from pathlib import Path
+import pandas as pd
+from bs4 import BeautifulSoup
+from PIL import Image
+   
+#version 17.5
+
+colorama.init(autoreset=True)
+alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
+print(alert_message)
+
+help_text = (
+    f"{Fore.YELLOW}Welcome to the Interactive Chat and File Text Extraction Script!{Style.RESET_ALL}\n"
+    f"This script leverages OpenAI's GPT for conversation and extracts text from specified files to facilitate dynamic interactions.\n\n"
+    
+    f"{Fore.CYAN}Special Commands:{Style.RESET_ALL}\n"
+    f"  {Fore.GREEN}/help{Style.RESET_ALL}  - Show this help message.\n\n"
+    f"  {Fore.GREEN}/exit{Style.RESET_ALL}  - Exit the script.\n\n"
+    f"  {Fore.GREEN}/clear{Style.RESET_ALL} - Clear all records from the conversation and output files\n\n" +
+    f"  {Fore.GREEN}/url{Style.RESET_ALL}   - If you mention 'url' and then link, then ask a question about it,\n"
+    f"          GPT will read the text from the URL and give a response accordingly.\n"
+    f"          Example:\n"
+    f"          url https://example.com explain me this article/summarize this article.\n"
+    f"          Important: {Style.BRIGHT}This option may not work on all websites!\n\n{Style.RESET_ALL}"
+    f"  {Fore.GREEN}/read{Style.RESET_ALL}  - Read the content of a specified file. Accepted file types are {Style.BRIGHT} txt, md, html, css, xml,\n"
+    f"           pdf, xls, xlsx, csv, py.\n{Style.RESET_ALL}"
+    f"          Example:\n"
+    f"          /read /path/to/your/file.txt\n\n"
+    f"  {Fore.GREEN}/translate{Style.RESET_ALL} - only translate next words without any exaplaintion.\n\n"
+    f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n"
+
+)
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+modelSource = "gpt-4o"
+# global conversation_log,file_text,uhistory,bhistory,filename
+conversation_log =[]
+file_text=[]
+uhistory = []
+bhistory = []
+filename=""
+CHUNK_SIZE = 1024  
+texttoadd=""
+
+timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def process_conversation_log(conv):
+    conv_str= ' '.join(conv)
+    uhistory = []
+    bhistory = []
+    current_message = ""
+    current_author = None  
+
+    for line in conv_str.strip().split("\n"):
+        if line[:19].count(":") == 2:  
+            if current_author == "USER":
+                uhistory.append(current_message.strip())
+            elif current_author == "BOT":
+                bhistory.append(current_message.strip())
+
+            colon_space_index = line.find(": ") -4
+            current_message = line[colon_space_index:]
+            current_author = "USER" if "USER:" in line else "BOT"
+        else:
+            current_message += " " + line
+
+    if current_author == "USER":
+        uhistory.append(current_message.strip())
+    elif current_author == "BOT":
+        bhistory.append(current_message.strip())
+
+    return uhistory, bhistory
+ 
+def extract_text_from_url(url, output_dir):
+    try:
+        response = requests.get(url, timeout=10)  # Added timeout for the request
+        response.raise_for_status()  # This will raise an HTTPError for bad responses
+
+        response = requests.get(url)
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        for script in soup(["script", "style"]):
+            script.decompose()
+
+        text = soup.get_text()
+
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = '\n'.join(chunk for chunk in chunks if chunk)
+
+        title = soup.title.string if soup.title else "default_title"  # use "default_title" if title is None
+        title = re.sub('[\W_]+', '_', title)
+
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f"{title}_{timestamp}.txt"
+
+        with open(os.path.join(output_dir, filename), 'w') as f:
+            f.write(text)
+        return filename
+
+    except HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}") 
+    except ConnectionError:
+        print("Error connecting to the server. Please check your internet connection or the website may be down.")
+    except Timeout:
+        print("The request timed out. Please try again later.")
+    except RequestException as err:
+        print(f"An unexpected error occurred: {err}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    return None
+
+
+
+def get_bot_response(uinput):
+    global temptext,uhistory,bhistory, conversation_log,terminal_log,file_text
+    summary_string=""
+    temptext=""
+    filemsg=""
+    try:
+        if file_text:
+                filemsg = f'''
+                user gave you book file text to read. you must:
+                1. read above the last file he give u 
+                2. you must answer only from that book. 
+                3. read it again and again to be sure that you answer only from this source only. and not from your knowledge. 
+                content of file is here:  {file_text}
+                '''
+      #  print(filemsg)
+        response = client.chat.completions.create(
+        model=modelSource,
+        messages=[
+                    {
+                        'role': 'system',
+                        'content': f'''
+                        Your job is to serve the user for any help needed. You act as human and you act as if you have emotions and feelings. Don't ever mention you are AI.
+                        Contact the user only by their name, if you know it. IF YOU DON'T KNOW THE NAME OF THE USER THEN DON'T MENTION ANY NAME.
+                        Do not say "Hello" to the user in each message.
+                        I want you to use proper visual response if it's more than one line.
+                        I need you to be smart to separate lines and make paragraphs and headlines or follow by a, b, c or follow by 1, 2, 3. Use it wisely.
+                        if you dont know specific info - just say you dont know. dont ever make up information. no illusion, you must be precise and accurate.
+                        {filemsg}
+                        '''
+                    },
+                    {
+                        'role': 'assistant',
+                        'content':  f'''
+                        whenever i ask you to remember or recall something i mean to this conversation: {conversation_log} 
+                        but you not limited to our conversation only you can answer question from your knowledge.
+                        if i tell you to remember what you said before in conversation i mean to this: {bhistory}
+                        if i tell you to remember what user or me said i mean this: {uhistory}
+                        therefore you need to use this info to contact user by his name only.
+                        
+                        '''
+                    },
+                    {
+                        "role": "user",
+                        "content": uinput
+                    },
+            
+        ],
+        stream=True,
+        temperature=1,
+        max_tokens=3000
+        )
+        summary=""
+        temptext=""
+        ch=""
+        finish=""
+        for chunk in response:
+            ch = chunk.choices[0]
+            txt=ch.delta.content
+            finish = ch.finish_reason
+          #  print(ch)
+            if txt:
+                temptext = txt
+                summary += temptext
+                print(Fore.GREEN + temptext + Style.RESET_ALL, end="", flush=True)
+
+            if finish:
+                if "length" in finish:
+                    print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
+                    summary = summary.strip().split("\n")
+                    summary_string = "\n".join(summary)
+                    texttoadd=f"{timestamp} BOT: {summary_string}\n"
+                    conversation_log.append(texttoadd)
+                    save_conversation(texttoadd)
+                    uinput="read history u cut ur response continue  eaxctly where u left off" 
+                    return get_bot_response(uinput)
+                elif "stop" in finish:
+                    break
+            elif finish==None and txt==None:
+                print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
+                summary = summary.strip().split("\n")
+                summary_string = "\n".join(summary)
+                texttoadd=f"{timestamp} BOT: {summary_string}\n"
+                conversation_log.append(texttoadd)
+                save_conversation(texttoadd)
+                uinput="read history u cut ur response continue  eaxctly where u left off" 
+                return get_bot_response(uinput)
+
+
+               
+                #print(Fore.RED + "Incomplete response, retrying...\n" + Style.RESET_ALL)
+               
+                
+            # if ch and "stop" not in finish:
+            #     temptext = chunk.choices[0].delta.content
+            #     summary+=temptext
+            #     print(Fore.GREEN+temptext+Style.RESET_ALL,end="",flush=True)       
+        # print("\n\n",finish)
+       # print("\n\n",summary)
+        print("\n")   
+        summary = summary.strip().split("\n")
+        summary_string = "\n".join(summary)
+        texttoadd=f"{timestamp} BOT: {summary_string}\n"
+        conversation_log.append(texttoadd)
+        save_conversation(texttoadd)
+
+    except openai.APIError as e:
+        #Handle API error here, e.g. retry or log
+        errors=str(e)
+        error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
+        print(f"{error_message}")
+        sys.exit(1)
+
+    except openai.APIConnectionError as e:
+        #Handle connection error here
+        errors=str(e)
+        error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
+        print(f"{error_message}")
+        sys.exit(1)
+
+    except openai.RateLimitError as e:
+        #Handle rate limit error (we recommend using exponential backoff)
+        errors=str(e)
+        error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
+        print(f"{error_message}")
+        sys.exit(1)
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
+
+    except KeyboardInterrupt:
+        print("\n")   
+        inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+        if inp.lower() == "y":
+            print("Exiting...")
+            sys.exit(1)    
+        else:
+            print("Resuming...")
+        
+
+    return summary_string
+     
+
+def read_history():
+    global conversation_log
+    if os.path.exists("conversation.txt"):
+        with open("conversation.txt", "r") as f:
+            lines = f.readlines()
+            if len(lines) > 1000:
+                lines = lines[-1000:]  
+            for line in lines:
+                conversation_log.append(line)
+   #print(conversation_log)
+
+ 
+def clear_files():
+    global conversation_log,file_text,uhistory,bhistory
+    conversation_log = []
+    uhistory=[]
+    bhistory=[]
+    file_text=""
+    with open("conversation.txt", "w") as file:
+        pass         
+    current_script = os.path.basename(__file__)
+    files_in_directory = glob.glob('*')
+    files_to_keep = ['conversation.txt', current_script]
+    for file in files_in_directory:
+        if file not in files_to_keep and os.path.isfile(file):
+            os.remove(file)
+           
+def save_conversation(textadd):
+    global conversation_log
+    with open("conversation.txt", "a") as f:
+        f.write(textadd + "\n") 
+      
+
+def conv():
+    global conversation_log
+
+def is_binary(file_path):
+    # Read the file in binary mode and check for non-text characters
+    try:
+        with open(file_path, 'rb') as file:
+            chunk = file.read(1024)  # Read the first 1024 bytes
+            # Check for null bytes or other non-text characters
+            if b'\0' in chunk:
+                return True
+            # Check for non-ASCII characters
+            text_characters = bytearray({7, 8, 9, 10, 12, 13, 27}.union(set(range(0x20, 0x100)) - {0x7f}))
+            if not all(byte in text_characters for byte in chunk):
+                return True
+        return False
+    except Exception as e:
+        pass #print(f"Error checking if file is binary: {e}")
+        return False
+
+
+def read_file(file):
+    global file_text  # Declare the global variable
+    file_text = []  # Ensure file_text is reset each time this function is called
+    
+    print(f"Checking if file exists: {os.path.exists(file)}")  # Debugging line
+    if os.path.exists(file): 
+        file_extension = Path(file).suffix.lower()
+        if file_extension.strip()=="" and is_binary(file):
+                 print("File is a binary executable and cannot be read.")
+                 return False
+
+       # print(f"File extension: {file_extension}")  # Debugging line
+
+        if file_extension == '.csv':
+            file_text = pd.read_csv(file)
+            file_text=file_text.to_string(index=False)
+            return file_text
+
+        if file_extension == '.xlsx':
+            df = pd.read_excel(file, engine='openpyxl')
+            csv_file = file.replace(".xlsx", ".csv")
+            df.to_csv(csv_file, index=False)
+            # Now read the converted CSV file and return its content
+            file_text = pd.read_csv(csv_file)
+            return file_text.to_string(index=False)
+        
+        elif file_extension == '.xls':
+            df = pd.read_excel(file, engine='xlrd')
+            csv_file = file.replace(".xls", ".csv")
+            df.to_csv(csv_file, index=False)
+            # Now read the converted CSV file and return its content
+            file_text = pd.read_csv(csv_file)
+            return file_text.to_string(index=False)
+        
+        elif file_extension == '.pdf':
+                # Use pdftotext to convert PDF to text
+                txt_file = file.replace(".pdf",".txt")
+                subprocess.run(['pdftotext', file, txt_file])
+                with open(txt_file, 'r') as f:
+                    file_text = f.read()
+                return file_text
+    
+        elif file_extension in [".txt",".md",".js","",".py",".css",".xml"]:
+            with open(file, "r", encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+                file_text = ''.join(lines)
+            if file_text:
+                return file_text
+
+        elif file_extension == '.html':
+                with open(file, "r", encoding='utf-8') as f:
+                    soup = BeautifulSoup(f, 'html.parser')
+                    # Remove all script and style elements
+                    for script_or_style in soup(["script", "style"]):
+                        script_or_style.decompose()
+                    # Get text
+                    text = soup.get_text()
+                    # Break into lines and remove leading and trailing space on each
+                    lines = (line.strip() for line in text.splitlines())
+                    # Drop blank lines
+                    file_text = '\n'.join(line for line in lines if line)
+                    return file_text
+
+        else:
+            return f"Unsupported file extension: {file_extension}"
+    else:
+        print(f"File not found: {file}")
+        return False
+        
+        
+def extract_filename(user_input):
+    pattern = r'^/read\s+(.+)$'
+    match = re.match(pattern, user_input)
+    if match:
+        return match.group(1)
+    return None
+
+     
+def extract_filepic(user_input):
+    pattern = r'^/image\s+(.+)$'
+    match = re.match(pattern, user_input)
+    if match:
+        return match.group(1)
+    return None
+
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+def ocr_image(image_path):
+    # Open the image file
+    image = Image.open(image_path)
+    # Use pytesseract to do OCR on the image
+    text = pytesseract.image_to_string(image)
+    return text
+
+def process_image_with_gpt4o(image_path,user_input2,text_from_image):
+    # Encode the image to base64
+    base64_image = encode_image(image_path)
+    
+    # Create the payload for GPT-4o
+    payload = {
+        "model": "gpt-4-vision-preview",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"the ocr engine say: {text_from_image} watch the image and answer: {user_input2}"},
+                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
+                ]
+            }
+        ],
+        "max_tokens": 4095
+    }
+    
+    # Define headers
+    headers = {
+        "Authorization": f"Bearer {openai.api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    # Send the request to the API
+    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+    return response.json()
+
+
+read_history()
+uhistory, bhistory = process_conversation_log(conversation_log)
+#conv()
+
+while True:
+    try:   
+        texttoadd=""
+        ui=""
+        user_input=""
+        user_input = input(Fore.BLUE+Style.BRIGHT+'You: '+Style.RESET_ALL)
+        ui=user_input
+        texttoadd=f"{timestamp} USER: {ui}"
+    
+        if ui.strip() == "/exit":
+            break      
+            
+        if ui.strip() == "/help":
+            print(help_text)   
+            continue  
+
+        if ui.strip() == "/clear":
+            confirm=input("this operation will clear all the conversation and delete all output files. are you sure? y/n\n")
+            if confirm.lower() == "y":
+                clear_files()
+            continue
+
+        if "/url" in ui:        
+            url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+            urls = re.findall(url_pattern, user_input)
+            filename=extract_text_from_url(urls[0],os.getcwd())
+            if filename:
+                print("got url")
+                with open(os.path.join(os.getcwd(), filename), "r") as f:
+                    file_content = f.read()
+                ui = ui.replace(urls[0], file_content)
+                ui = ui.replace("/url", "")
+                texttoadd=f"{timestamp} USER: {ui}"
+               # print(ui+"\n\n")
+            else:
+                continue
+
+        if "/read" in ui:
+            file=extract_filename(ui)
+            file_text=read_file(file)
+            file_text=f"file name: {file}, content: {file_text}"
+           # print(file_text)
+            if file_text:    
+              #  ui = ui.replace("/read", "")
+             #   ui=f"read this file name: {file} content: {file_text}"
+                user_input2=input(Fore.BLUE + Style.BRIGHT + 'what the request on the file?: ' + Style.RESET_ALL).strip()
+              #  ui=ui+ "\n\n  from now on all my questions reffering to this text of the file. first request from user: \n  " +user_input2
+                ui=f"read this file name: {file} question: {user_input2}"
+                texttoadd= f"{timestamp} USER: {ui}"  
+                      
+
+        # if "/image" in ui: 
+        #     image_path=extract_filepic(ui)
+        #     text_from_image = ocr_image(image_path)
+        #     user_input2=input(Fore.BLUE + Style.BRIGHT + 'what the request on the image?: ' + Style.RESET_ALL).strip()
+        #     gpt4o_response = process_image_with_gpt4o(image_path,user_input2,text_from_image)
+
+        #     # Check if the response has 'choices' key and handle errors
+        #     if 'choices' in gpt4o_response:
+        #         summary = gpt4o_response['choices'][0]['message']['content']
+        #         print(Fore.GREEN + summary+"\n" + Style.RESET_ALL, end="", flush=True)
+        #         print("")
+        #     else:
+        #         print(Fore.RED + "Error in GPT-4o response:" + str(gpt4o_response) + Style.RESET_ALL)
+        #         print("")
+        #     texttoadd=f"{timestamp} USER: IMAGE - {user_input2}"
+        #     conversation_log.append(texttoadd)
+        #     save_conversation(texttoadd)
+        #     texttoadd=f"{timestamp} BOT: {summary}\n"
+        #     conversation_log.append(texttoadd)
+        #     save_conversation(texttoadd)
+        #     continue
+
+        if "/tr" in ui:
+            text=ui.replace("/tr", "")
+            texttoadd=f"{timestamp} USER: translate this {text}"
+            continue
+
+        conversation_log.append(texttoadd)
+        save_conversation(texttoadd)
+       # if "/image" not in ui:
+       # print(ui)
+        response = get_bot_response(ui)
+
+        
+
+    except KeyboardInterrupt:
+        print("\n")   
+        try:
+            inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+            if inp.lower() == "y":
+                print("Exiting...")
+                break  
+            else:
+                print("Resuming...")   
+        except KeyboardInterrupt:
+            print("\nMultiple interrupt signals received. Exiting...")
+            break   
+ 
+
+ 
+
+ 

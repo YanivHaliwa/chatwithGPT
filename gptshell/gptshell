@@ -1,0 +1,292 @@
+#!/usr/bin/env python3
+
+import os
+import textwrap
+import openai
+from openai import OpenAI
+import colorama
+from colorama import Fore, Style
+from urllib.parse import urlparse
+import re
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
+import time
+import threading
+import sys
+from datetime import datetime, timedelta
+import subprocess
+import shlex
+from colorama import Fore, Style
+
+#version 9.4
+
+
+colorama.init(autoreset=True)
+alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
+print(alert_message)
+
+
+help_text = (
+    f"This script is designed to use GPT to suggest,process, execute Linux commands based on user input.\n\n"
+    f"{Fore.CYAN}Options:{Style.RESET_ALL}\n"
+    f"  {Fore.GREEN}/help{Style.RESET_ALL}               - Show this help message.\n"
+    f"  {Fore.GREEN}exit{Style.RESET_ALL}                - Exit the script.\n"    
+    f"{Fore.RED}Important Notes:{Style.RESET_ALL}\n"
+    f"- Use caution when executing suggested commands, especially those prefixed with {Fore.RED}sudo{Style.RESET_ALL}.\n\n"
+    )
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+modelSource = "gpt-4o"
+#modelSource = "gpt-4"
+uhistory = []
+bhistory = []
+conversation_log =[]
+terminal_log =[]
+filename=""
+CHUNK_SIZE = 1024   
+
+timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+ 
+
+def execute_command(command):
+    execution_path=os.path.expanduser('~')
+    command_string = command if isinstance(command, str) else " ".join(command)
+    safe_command = shlex.quote(command_string)
+    final_command = f"bash -c {safe_command}"
+    env = os.environ.copy()
+    process = subprocess.Popen(final_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True, bufsize=1, universal_newlines=True, cwd=execution_path) 
+    stdout_output = ""
+    stderr_output = ""
+    line =""
+    print(Fore.CYAN + "Command output:" + Style.RESET_ALL)
+    for line in process.stdout:    
+        print(line, end='')   
+        stdout_output += line  
+    stderr_output = process.stderr.read()
+    if stderr_output:
+        print(f"Error: {stderr_output}")   
+    process.wait()
+    return stdout_output, stderr_output
+
+
+def process_conversation_log(conversation_log):
+    global uhistory,bhistory
+    conversation_log= ' '.join(conversation_log)
+    
+    current_message = ""
+    line=""
+    current_author = None   
+
+    for line in conversation_log.strip().split("\n"):
+        if line[:19].count(":") == 2:  
+            if current_author == "USER":
+                uhistory.append(current_message.strip())
+            elif current_author == "BOT":
+                bhistory.append(current_message.strip())
+
+            colon_space_index = line.find(": ") -4
+            current_message = line[colon_space_index:]
+            
+            current_author = "USER" if "USER:" in line else "BOT"
+        else:
+            current_message += " " + line
+
+    if current_author == "USER":
+        uhistory.append(current_message.strip())
+    elif current_author == "BOT":
+        bhistory.append(current_message.strip())
+
+    return uhistory, bhistory
+     
+
+def get_bot_response(uinput):
+    global temptext,uhistory,bhistory, conversation_log,terminal_log
+    summary_string=""
+    temptext=""
+    try:
+        response = client.chat.completions.create(
+        model=modelSource,
+        messages=[
+            {
+                'role': 'system',
+                'content': '''
+                1. You are an expert in Linux commands, responding to queries with concise command examples only. 
+                q. Provide direct Linux command responses without explanations, text, context, code block markers, or language specifications. 
+                2. Your responses should consist solely of the command needed to fulfill the request, with no additional formatting or instructions.
+                3. your commands going to be run in enviroment - so make your respond of command suit for enviroment variables.
+                4. never use placeholder and in your respond like "/path/to/" because as i said it gonna be run so your answer must be precise exact. 
+                5. if you dont know the location or name file - then add command to figure it out.
+                6. when you need to do give respond of search or similiar command always redirect error output to null
+                7. if its command that probably need permission -then you must add 'sudo' to your command.
+
+                '''
+            },
+            {
+                'role': 'assistant',
+                'content': f'''
+                    whenever i ask you to remember or recall something i mean to this conversation: {conversation_log}
+                    but you not limited to our conversation only you can answer question from your knowledge.
+                    if i tell you to remember what you said before in conversation i mean to this: {bhistory}
+                    if i tell you to remember what user or me said i mean this: {uhistory}
+                    if have any error in the command you sent you should look for the last command you suggest and his output you find it here {terminal_log}
+                '''
+            },
+        
+            {
+                "role": "user", 
+                "content": uinput
+            },
+            
+        ],
+        stream=True,
+        temperature=1,
+        max_tokens=500
+        )
+        summary=""
+        temptext=""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:  
+                temptext = chunk.choices[0].delta.content
+                summary+=temptext
+                print(Fore.GREEN+temptext+Style.RESET_ALL,end="",flush=True)            
+        print("\n")   
+        summary = summary.strip().split("\n")
+        summary_string = "\n".join(summary)
+        texttoadd=f"{timestamp} BOT: {summary_string}\n"
+        conversation_log.append(texttoadd)
+        save_conversation(texttoadd)
+
+    except Exception as e:
+        error_message = str(e)
+        if "context length exceeded" in error_message or "code: 400" in error_message:
+            response="Detected token limit issue, lets start new conversation"
+            conversation_log= []
+        else:
+            print(f"An error occurred: {e}")
+
+    except KeyboardInterrupt:
+        pass
+       
+
+    return summary_string
+
+def read_history():
+    global conversation_log
+    line=""
+    if os.path.exists("conversation.txt"):
+        with open("conversation.txt", "r") as f:
+            lines = f.readlines()
+            if len(lines) > 500:
+                lines = lines[-500:]  
+            for line in lines:
+                conversation_log.append(line)
+
+
+def read_terminal():
+    global terminal_log
+    if os.path.exists("terminal_result.txt"):
+        with open("terminal_result.txt", "r") as f:
+            lines = f.readlines()
+            if len(lines) > 500:
+                lines = lines[-500:]   
+            for line in lines:
+                terminal_log.append(line)
+
+def clear_files():
+    conversation_log = []
+    with open("conversation.txt", "w") as file:
+        pass 
+    with open("terminal_result.txt", "w") as file:
+        pass  
+
+def save_conversation(textadd):
+    global conversation_log
+    with open("conversation.txt", "a") as f:
+        f.write(textadd + "\n") 
+   
+
+def conv():
+    global conversation_log
+    while True:
+        try:
+            ui=""
+            user_input=""
+            user_input = input(Fore.BLUE + Style.BRIGHT + 'You: ' + Style.RESET_ALL).strip()
+            ui=user_input.lower()
+
+            if ui == "exit":
+                break
+
+            if ui == "/help":
+                print(help_text)   
+                continue  
+            
+
+            if ui == "/clear":
+                confirm=input("are you sure you want to delete all recoreds of conversation file and code output? y/n\n")
+                if confirm.lower() == "y":
+                    clear_files()
+                continue
+            
+            texttoadd=f"{timestamp} USER: {ui}"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+
+            command = get_bot_response(ui).split()
+            if command:
+                execute = input(Fore.YELLOW + "Run this command? (y/n): " + Style.RESET_ALL).strip().lower()
+                if execute == 'y':
+                    print(Fore.CYAN + "Executing command..." + Style.RESET_ALL)
+                    output = execute_command(command)
+                    
+                    comstring=" ".join(command)
+                    outstring=" ".join(output)
+
+                    with open("terminal_result.txt", "a") as f:
+                        f.write(f"Command: {comstring}\n")
+                        f.write(f"Output:\n{outstring}\n")
+                        f.write("------\n")
+                    
+                    terminal_log.append(f"Command: {comstring}\n")
+                    terminal_log.append(f"Output:\n{outstring}\n")
+
+                elif execute == 'n':
+                    print(Fore.RED + "Command execution cancelled." + Style.RESET_ALL)
+                else:
+                    print(Fore.RED + "Invalid input. Command not executed." + Style.RESET_ALL)
+
+        except KeyboardInterrupt:
+            print("\n")   
+            try:
+                inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+                if inp.lower() == "y":
+                    print("Exiting...")
+                    break  
+                else:
+                    print("Resuming...")   
+            except KeyboardInterrupt:
+                print("\nMultiple interrupt signals received. Exiting...")
+                break   
+
+    
+ 
+uhistory, bhistory = process_conversation_log(conversation_log)
+read_history()
+read_terminal()
+try:
+        conv()
+except Exception as e:
+        print(f"An error occurred: {e}")
+finally:  
+        # conversation_log = [line for line in conversation_log if line.strip()]
+        # with open("conversation.txt", "a") as f:
+        #     for index, line in enumerate(conversation_log):
+        #         if index > 0:   
+        #             f.write("\n")  
+        #         f.write(line)
+                   
+        print("Goodbye!")
+        sys.exit(0)
+
+ 
