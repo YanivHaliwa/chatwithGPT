@@ -222,16 +222,6 @@ def get_bot_response(uinput):
                 return get_bot_response(uinput)
 
 
-               
-                #print(Fore.RED + "Incomplete response, retrying...\n" + Style.RESET_ALL)
-               
-                
-            # if ch and "stop" not in finish:
-            #     temptext = chunk.choices[0].delta.content
-            #     summary+=temptext
-            #     print(Fore.GREEN+temptext+Style.RESET_ALL,end="",flush=True)       
-        # print("\n\n",finish)
-       # print("\n\n",summary)
         print("\n")   
         summary = summary.strip().split("\n")
         summary_string = "\n".join(summary)
@@ -456,9 +446,9 @@ def process_image_with_gpt4o(image_path,user_input2,text_from_image):
     response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
     return response.json()
 
-
 def read_files_from_folder():
-    folder_path = Path('/home/yaniv/scripts-yaniv/chatwithGPT/gptchat/files/')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    folder_path = Path(os.path.join(script_dir, 'files'))
     files_content = []
     accepted_extensions = ['.txt', '.md', '.html', '.css', '.xml', '.pdf', '.xls', '.xlsx', '.csv', '.py', '']
     
@@ -480,6 +470,26 @@ def read_files_from_folder():
 
     return files_content
 
+
+def setup_environment():
+    # Define the paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    files_folder = os.path.join(script_dir, 'files')
+    conversation_file = os.path.join(script_dir, 'conversation.txt')
+
+    # Create 'files' folder if it doesn't exist
+    if not os.path.exists(files_folder):
+        os.makedirs(files_folder)
+        print(f"Created 'files' folder at {files_folder}")
+
+    # Create conversation.txt if it doesn't exist
+    if not os.path.exists(conversation_file):
+        with open(conversation_file, 'w') as f:
+            f.write("")  # Create an empty file
+        print(f"Created 'conversation.txt' at {conversation_file}")
+
+
+setup_environment()
 read_history()
 uhistory, bhistory = process_conversation_log(conversation_log)
 #conv()
@@ -555,7 +565,7 @@ while True:
             texttoadd=f"{timestamp} USER: IMAGE - {user_input2}"
             conversation_log.append(texttoadd)
             save_conversation(texttoadd)
-            
+
             gpt4o_response = process_image_with_gpt4o(image_path,user_input2,text_from_image)
 
             # Check if the response has 'choices' key and handle errors
