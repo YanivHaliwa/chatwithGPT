@@ -314,9 +314,27 @@ def conv():
             except KeyboardInterrupt:
                 print("\nMultiple interrupt signals received. Exiting...")
                 break   
+def setup_environment():
+    # Define the paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    conversation_file = os.path.join(script_dir, 'conversation.txt')
+    code_output_file= os.path.join(script_dir, 'code_output.txt')
 
-    
- 
+    if not os.path.exists(conversation_file):
+        with open(conversation_file, 'w') as f:
+            f.write("")  # Create an empty file
+        print(f"Created 'conversation.txt' at {conversation_file}")
+
+
+    if not os.path.exists(code_output_file):
+        with open(code_output_file, 'w') as f:
+            f.write("")  # Create an empty file
+        print(f"Created 'code_output.txt' at {code_output_file}")
+
+
+
+setup_environment()
+
 uhistory, bhistory = process_conversation_log(conversation_log)
 read_history()
 read_code_output()

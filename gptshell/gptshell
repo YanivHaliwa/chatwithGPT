@@ -269,7 +269,24 @@ def conv():
                 print("\nMultiple interrupt signals received. Exiting...")
                 break   
 
-    
+def setup_environment():
+    # Define the paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    conversation_file = os.path.join(script_dir, 'conversation.txt')
+    term_result_file= os.path.join(script_dir, 'terminal_result.txt')
+
+    if not os.path.exists(conversation_file):
+        with open(conversation_file, 'w') as f:
+            f.write("")  # Create an empty file
+        print(f"Created 'conversation.txt' at {conversation_file}")
+
+
+    if not os.path.exists(term_result_file):
+        with open(term_result_file, 'w') as f:
+            f.write("")  # Create an empty file
+        print(f"Created 'terminal_result.txt' at {term_result_file}")
+
+setup_environment()
  
 uhistory, bhistory = process_conversation_log(conversation_log)
 read_history()
