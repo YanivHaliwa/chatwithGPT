@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 import subprocess
 import shlex
 
-#version 9.4
+#version 10.8.24
 
 colorama.init(autoreset=True)
 
