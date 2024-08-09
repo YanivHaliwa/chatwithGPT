@@ -32,7 +32,7 @@ help_text = (f"{Fore.CYAN}Usage:{Style.RESET_ALL} script_name.py [OPTION]\n\n" +
              f"  {Fore.GREEN}/run{Style.RESET_ALL}            Execute the last generated Python script, capturing its output\n" +
              f"  {Fore.GREEN}/clear{Style.RESET_ALL}          Clear all records from the conversation and code output files\n" +
              f"  {Fore.GREEN}/read <file>{Style.RESET_ALL}    Read and process the specified file's content\n" + 
-             f"  {Fore.GREEN}exit{Style.RESET_ALL}            to exit the script.\n")
+             f"  {Fore.GREEN}/exit{Style.RESET_ALL}            to exit the script.\n")
 
 
 
@@ -42,16 +42,20 @@ uhistory = []
 bhistory = []
 conversation_log =[]
 code_output_log =[]
-filename=""
-CHUNK_SIZE = 1024   
-filename=""
+global filename,base
+if len(sys.argv) > 1:
+    base = sys.argv[1]
+else:
+    base = os.getcwd()
+filename= os.path.join(base, "")
+CHUNK_SIZE = 1024
 code =""
 pip_installs=[]
 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
 def execute_command():
-    global filename
+    global filename,base
     print("\nrunning: "+ filename)
     args = input("\nEnter arguments (or press enter for none): ").strip()
     command = f"python3 {filename} {args} | tee code_output.txt"
@@ -93,7 +97,7 @@ def process_conversation_log(conversation_log):
     return uhistory, bhistory
 
 def save_code(code):
-    global filename
+    global filename,base
     with open(filename, 'w') as file:
         file.write(code)
     print(f"\n\nCode saved to {filename}\n")
@@ -114,7 +118,7 @@ def parse_gpt_response(response_text):
 
 
 def get_bot_response(uinput):
-    global temptext, uhistory, bhistory, conversation_log, code_output_log, pip_installs, code, filename
+    global temptext, uhistory, bhistory, conversation_log, code_output_log, pip_installs, code, filename,base
     texttoadd=""
     summary_string = ""
     temptext = ""
@@ -179,9 +183,9 @@ def get_bot_response(uinput):
         texttoadd=f"{timestamp} BOT:\n{summary_string}\n"
         conversation_log.append(texttoadd)
         save_conversation(texttoadd)
-        filename=""
+        filename = os.path.join(base, "")
         name, pip_installs, code = parse_gpt_response(summary_string)
-        filename = f"{name}.py"
+        filename = os.path.join(base, f"{name}.py")
         save_code(code)
        
 
@@ -236,7 +240,7 @@ def save_conversation(textadd):
    
 
 def conv():
-    global conversation_log,filename
+    global conversation_log,filename,base
     texttoadd=""
     while True:
         try:
@@ -247,7 +251,7 @@ def conv():
             user_input = input(Fore.BLUE + Style.BRIGHT + 'You: ' + Style.RESET_ALL).strip()
             ui=user_input.lower()
 
-            if ui == "exit":
+            if ui == "/exit":
                 break
             
             if ui == "/help":
@@ -265,7 +269,7 @@ def conv():
                 pattern = re.compile(r"name: (\w+)")
                 matches = pattern.findall(conversation_str)   
                 last_file_name = matches[-1] if matches else None
-                filename=last_file_name+".py"
+                filename = os.path.join(base,f"{last_file_name}.py")
                 output = execute_command()
                 code_output_log.append(f"file running: {filename}\n")
                 code_output_log.append(f"Output:\n{output}\n")
