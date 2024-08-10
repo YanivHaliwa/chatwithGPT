@@ -19,7 +19,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-#version 17.5
+#version 10.8.24
 
 colorama.init(autoreset=True)
 alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"

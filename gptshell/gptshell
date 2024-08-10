@@ -19,7 +19,7 @@ import subprocess
 import shlex
 from colorama import Fore, Style
 
-#version 9.4
+#version 10.8.24
 
 
 colorama.init(autoreset=True)
