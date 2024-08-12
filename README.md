@@ -35,7 +35,7 @@ This repository contains a suite of powerful Python-based tools that leverage Op
 
 ## Tool-specific Features and Usage
 
-### 1. Advanced GPT Chat (gptchat)
+### 1. GPT Chat Advanced (gptchat)
 
 A versatile chat interface with advanced file processing and image analysis capabilities.
 
@@ -68,7 +68,7 @@ python gptchat.py
 
 
 
-### 2. GPT for Python (gptpy)
+### 2. GPT Python (gptpy)
 
 A tool designed for generating, updating, and executing Python code snippets using GPT.
 
@@ -89,7 +89,8 @@ python gptpy.py
 - `/read <file>`: Read and process the specified file's content
 - `exit`: Exit the script
 
-### 3. Linux Command Expert ChatBot (gptshell)
+
+### 3. GPT for Linux Commands (gptshell)
 
 A ChatBot specialized in providing expert-level Linux command suggestions and execution.
 
