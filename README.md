@@ -40,10 +40,14 @@ This repository contains a suite of powerful Python-based tools that leverage Op
 A versatile chat interface with advanced file processing and image analysis capabilities.
 
 #### Features:
-- Text extraction from URLs
-- File reading and processing (supports txt, md, html, css, xml, pdf, xls, xlsx, csv, py)
-- Image processing with OCR and GPT-4 Vision integration
-- Bulk file reading from a designated 'files' folder
+- **Text extraction from URLs**: Fetch and process text content directly from web pages.
+- **File reading and processing**: Supports a wide range of file formats including `txt`, `md`, `html`, `css`, `xml`, `pdf`, `xls`, `xlsx`, `csv`, `py`.
+- **Bulk file reading**: Automatically process all supported files in a designated 'files' folder.
+- **Image processing with OCR and GPT-4 Vision integration**: Analyze images and extract relevant information.
+- **Custom bot creation with expertise and style**: Users can add special bots with custom expertise and communication styles. 
+    GPT will automatically determine which bot should respond to the user's query based on the context.
+
+
 
 #### Usage:
 ```
@@ -59,6 +63,10 @@ python gptchat.py
 - `/image [image path]`: Process an image for analysis
 - `/readfiles`: Read all supported files from the 'files' folder
 - `/tr [text]`: Translate the given text
+- `/add`: add user in bot lists
+- `/list`: list all existing bots in file
+
+
 
 ### 2. GPT for Python (gptpy)
 
