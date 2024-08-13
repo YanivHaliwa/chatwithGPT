@@ -51,7 +51,8 @@ help_text = (
     f"          Supported file types are: txt, md, html, css, xml, pdf, xls, xlsx, csv, py.\n\n"
     f"  {Fore.GREEN}/add{Style.RESET_ALL} - add new bot to list.\n\n"
     f"  {Fore.GREEN}/list{Style.RESET_ALL} - list all bots from file.\n\n"
-
+    f"  {Fore.GREEN}/multi{Style.RESET_ALL} - Get responses from all bots listed in the file. This can be disabled only by triggering the '/single' command. \n\n"
+    f"  {Fore.GREEN}/single{Style.RESET_ALL} - Get a response from only one bot, selected by the system. \n\n"
 )
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -65,6 +66,7 @@ uhistory = []
 bhistory = []
 # bots_list = []
 bots_exist=False
+multi=False
 filename=""
 CHUNK_SIZE = 1024  
 texttoadd=""
@@ -123,7 +125,7 @@ def process_conversation_log(conv, bots_list):
             bhistory.append(message)
         else:
             for bot in bots_list:
-                nameb = f"{bot['name']} ({bot['expertise']})"
+                nameb = f"{bot['name']} ({bot['description']})"
                 if f'{nameb}:' in line:
                     # Extract the message part after the bot name
                     message = line.split(f'{nameb}:', 1)[1].strip()
@@ -266,166 +268,210 @@ def get_analyse_bot(uinput):
             print("Resuming...")
     return summary_string
 
+
+
+    # bot=""
+    # if bots_list:
+    #     bot_choose = get_analyse_bot(uinput)
+    #     for boti in bots_list:
+    #         if boti['name'] == bot_choose:
+    #             bot = boti
+    #             break
+    
+    # bot_text=""
+    # bot_name="BOT"
+    # if bot:
+    #     bot_name=f"{bot['name']} ({bot['description']})"
+    #     bot_text=f"""
+    #     your name is  {bot_name}, and your description duty as {bot['description']} and your expertise is {bot['expertise']},
+    #     and you must reponde in style  {bot['style']}
+    #     you consist to be  {bot_name} until you notice user go other topic then you dissmissed.
+    #     you might see bot names in this conversation log. dont mix which user and which bot you can identify this by read user log and bot log as below"""
+    #     lastbot=bot['name']   
+    # else:
+    #    lastbot=""
+    #    pass
+
 def get_bot_response(uinput):
     global temptext,uhistory,bhistory, conversation_log,terminal_log,file_text,lastbot
-    bot=""
-    if bots_list:
-        bot_choose = get_analyse_bot(uinput)
-        for boti in bots_list:
-            if boti['name'] == bot_choose:
-                bot = boti
-                break
-    
-    bot_text=""
-    bot_name="BOT"
-    if bot:
-        bot_name=f"{bot['name']} ({bot['expertise']})"
-      #  print(f"Bot {bot_name} with expertise in '{bot['expertise']}' will respond.")
-        bot_text=f"""
-        your name is  {bot_name}, and your expertise is {bot['expertise']}, 
-        and you must reponde in style  {bot['style']}
-        you consist to be  {bot_name} until you notice user go other topic then you dissmissed.
-        you might see bot names in this conversation log. dont mix which user and which bot you can identify this by read user log and bot log as below"""
-        lastbot=bot['name']   
-    else:
-       lastbot=""
-       pass
-
     summary_string=""
-    temptext=""
-    filemsg=""
-    try:
-        if file_text:
-                print("respond from files..\n")
-                # print(file_text)
-                # sys.exit(1)
-                filemsg = f'''
-                user gave you book file text to read. you must:
-                1. read above the last file he give u 
-                2. you must answer only from that book. 
-                3. read it again and again to be sure that you answer only from this source only. and not from your knowledge. 
-                content of file is here:  {file_text}
-                '''
-        response = client.chat.completions.create(
-        model=modelSource,
-        messages=[
-                    {
-                        'role': 'system',
-                        'content': f'''
-                        Your job is to serve the user for any help needed. You act as human and you act as if you have emotions and feelings. Don't ever mention you are AI.
-                        Contact the user only by their name, if you know it. IF YOU DON'T KNOW THE NAME OF THE USER THEN DON'T MENTION ANY NAME.
-                        dont confuse with bots names which is in this list: {bots_list} only remember what user tell u his name
-                        Do not say "Hello" to the user in each message.
-                        I want you to use proper visual response if it's more than one line.
-                        I need you to be smart to separate lines and make paragraphs and headlines or follow by a, b, c or follow by 1, 2, 3. Use it wisely.
-                        if you dont know specific info - just say you dont know. dont ever make up information. no illusion, you must be precise and accurate.
-                        
-                        {filemsg}
-                        '''
-                    },
-                    {
-                        'role': 'assistant',
-                        'content':  f'''
-                        {bot_text}
-                        whenever i ask you to remember or recall something i mean to this conversation: {conversation_log} 
-                        but you not limited to our conversation only you can answer question from your knowledge.
-                        if i tell you to remember what you said before in conversation i mean to this: {bhistory}
-                        if i tell you to remember what user or me said i mean this: {uhistory}
-                        therefore you need to use this info to contact user by his name only.    
-                        '''
-                    },
-                    {
-                        "role": "user",
-                        "content": uinput
-                    },
-            
-        ],
-        stream=True,
-        temperature=1,
-        max_tokens=500
-        )
-        summary=""
-        temptext=""
-        ch=""
-        finish=""
-        print(f"\n{bot_name}: ", end="")
-        for chunk in response:
-            ch = chunk.choices[0]
-            txt=ch.delta.content
-            finish = ch.finish_reason
-          #  print(ch)
-            if txt:
-                temptext = txt
-                summary += temptext
-                print(Fore.GREEN + temptext + Style.RESET_ALL, end="", flush=True)
+    bot_name = "BOT"
+    bots_to_use = []
+    first_bot = True
 
-            if finish:
-                if "length" in finish:
-                    print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
-                    summary = summary.strip().split("\n")
-                    summary_string = "\n".join(summary)
-                    texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-                    conversation_log.append(texttoadd)
-                    save_conversation(texttoadd)
-                    uinput="read history u cut ur response continue  eaxctly where u left off" 
-                    return get_bot_response(uinput)
-                elif "stop" in finish:
+    if multi and bots_list:
+        bots_to_use = bots_list 
+    else:
+        bot = ""
+        if bots_list:
+            bot_choose = get_analyse_bot(uinput)
+            for boti in bots_list:
+                if boti['name'] == bot_choose:
+                   # bot = boti
+                    bots_to_use = [boti] 
                     break
-            elif finish==None and txt==None:
-                print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
-                summary = summary.strip().split("\n")
-                summary_string = "\n".join(summary)
-                texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-                conversation_log.append(texttoadd)
-                save_conversation(texttoadd)
-                uinput="read history u cut ur response continue  eaxctly where u left off" 
-                return get_bot_response(uinput)
-
-
-        print("\n")   
-        summary = summary.strip().split("\n")
-        summary_string = "\n".join(summary)
-        texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-        conversation_log.append(texttoadd)
-        save_conversation(texttoadd)
-
-    except openai.APIError as e:
-        #Handle API error here, e.g. retry or log
-        errors=str(e)
-        error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
-        print(f"{error_message}")
-        sys.exit(1)
-
-    except openai.APIConnectionError as e:
-        #Handle connection error here
-        errors=str(e)
-        error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
-        print(f"{error_message}")
-        sys.exit(1)
-
-    except openai.RateLimitError as e:
-        #Handle rate limit error (we recommend using exponential backoff)
-        errors=str(e)
-        error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
-        print(f"{error_message}")
-        sys.exit(1)
-
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        sys.exit(1)
-
-    except KeyboardInterrupt:
-        print("\n")   
-        inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
-        if inp.lower() == "y":
-            print("Exiting...")
-            sys.exit(1)    
-        else:
-            print("Resuming...")
         
+    #print("use  ",bots_to_use)
+    if not bots_to_use:
+                 bots_to_use = [{"name": "BOT", "description": "", "expertise": "", "style": ""}]
+    
+    for bot in bots_to_use:
+        bot_text = ""
+        bot_name = "BOT"
+        if bot and bot['name'] != "BOT":
+            bot_name = f"{bot['name']} ({bot['description']})"
+            bot_text = f"""
+            your name is  {bot_name}, and your description duty as {bot['description']} and your expertise is {bot['expertise']},
+            and you must reponde in style  {bot['style']}
+            you consist to be  {bot_name} until you notice user go other topic then you dissmissed.
+            you might see bot names in this conversation log. dont mix which user and which bot you can identify this by read user log and bot log as below
+            YOU MUST FOCUS TO RESPOND ONLY IN YOUR EXPERTISE AND DESCRIPTION AREA NOTHING ELSE. pay attention to user and give details according of your spcialty only
+            be uniq. speical in your epxertise.         
+            """
+            if first_bot==False:
+                bot_text = bot_text + """
+                \n last bot said his opinion now be UNIQ and bring your prespecitve iun your epxertise area.
+                DO NOT SUMMARISE WHAT OTHER BOT SAID. 
+                DO NOT REPEAT WHAT OTHER BOT SAID.
+                """
+            lastbot = bot['name']   
+        else:
+            lastbot = ""
+            pass
+        summary_string=""
+        temptext=""
+        filemsg=""
+       # print ("text: \n",bot_text)
+        try:
+            if file_text:
+                    print("respond from files..\n")
+                    filemsg = f'''
+                    user gave you book file text to read. you must:
+                    1. read above the last file he give u 
+                    2. you must answer only from that book. 
+                    3. read it again and again to be sure that you answer only from this source only. and not from your knowledge. 
+                    content of file is here:  {file_text}
+                    '''
+            response = client.chat.completions.create(
+            model=modelSource,
+            messages=[
+                        {
+                            'role': 'system',
+                            'content': f'''
+                            Your job is to serve the user for any help needed. You act as human and you act as if you have emotions and feelings. Don't ever mention you are AI.
+                            Contact the user only by their name, if you know it. IF YOU DON'T KNOW THE NAME OF THE USER THEN DON'T MENTION ANY NAME.
+                            dont confuse with bots names which is in this list: {bots_list} only remember what user tell u his name
+                            Do not say "Hello" to the user in each message.
+                            I want you to use proper visual response if it's more than one line.
+                            I need you to be smart to separate lines and make paragraphs and headlines or follow by a, b, c or follow by 1, 2, 3. Use it wisely.
+                            if you dont know specific info - just say you dont know. dont ever make up information. no illusion, you must be precise and accurate.
+                            
+                            {filemsg}
+                            '''
+                        },
+                        {
+                            'role': 'assistant',
+                            'content':  f'''
+                            {bot_text}
+                            whenever i ask you to remember or recall something i mean to this conversation: {conversation_log} 
+                            but you not limited to our conversation only you can answer question from your knowledge.
+                            if i tell you to remember what you said before in conversation i mean to this: {bhistory}
+                            if i tell you to remember what user or me said i mean this: {uhistory}
+                            therefore you need to use this info to contact user by his name only.    
+                            '''
+                        },
+                        {
+                            "role": "user",
+                            "content": uinput
+                        },
+                
+            ],
+            stream=True,
+            temperature=0.7,
+            max_tokens=100
+            )
+            summary=""
+            temptext=""
+            ch=""
+            finish=""
+            print(f"\n{bot_name}: ", end="")
+            for chunk in response:
+                ch = chunk.choices[0]
+                txt=ch.delta.content
+                finish = ch.finish_reason
+            #  print(ch)
+                if txt:
+                    temptext = txt
+                    summary += temptext
+                    print(Fore.GREEN + temptext + Style.RESET_ALL, end="", flush=True)
 
+                # if finish:
+                #     if "length" in finish:
+                #         print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
+                #         summary = summary.strip().split("\n")
+                #         summary_string = "\n".join(summary)
+                #         texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                #         conversation_log.append(texttoadd)
+                #         save_conversation(texttoadd)
+                #         uinput="read history u cut ur response continue  eaxctly where u left off" 
+                #         return get_bot_response(uinput)
+                #     elif "stop" in finish:
+                #         break
+                # elif finish==None and txt==None:
+                #     print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
+                #     summary = summary.strip().split("\n")
+                #     summary_string = "\n".join(summary)
+                #     texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                #     conversation_log.append(texttoadd)
+                #     save_conversation(texttoadd)
+                #     uinput="read history u cut ur response continue  eaxctly where u left off" 
+                #     return get_bot_response(uinput)
+
+            print("\n")   
+            summary = summary.strip().split("\n")
+            summary_string = "\n".join(summary)
+            texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+            conversation_log.append(texttoadd)
+            save_conversation(texttoadd)
+            first_bot= False
+
+        except openai.APIError as e:
+            #Handle API error here, e.g. retry or log
+            errors=str(e)
+            error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
+            print(f"{error_message}")
+            sys.exit(1)
+
+        except openai.APIConnectionError as e:
+            #Handle connection error here
+            errors=str(e)
+            error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
+            print(f"{error_message}")
+            sys.exit(1)
+
+        except openai.RateLimitError as e:
+            #Handle rate limit error (we recommend using exponential backoff)
+            errors=str(e)
+            error_message = errors.split("'type':")[0].split("'message':")[1].strip().strip(",").strip("'").strip()
+            print(f"{error_message}")
+            sys.exit(1)
+
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            sys.exit(1)
+
+        except KeyboardInterrupt:
+            print("\n")   
+            inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+            if inp.lower() == "y":
+                print("Exiting...")
+                sys.exit(1)    
+            else:
+                print("Resuming...")
+            
+    
     return summary_string
-     
+        
 
 def read_history():
     global conversation_log
@@ -742,12 +788,14 @@ while True:
        
         if "/add" in ui:
             name_bot = input(Fore.BLUE + Style.BRIGHT + 'What is the name of the bot? ' + Style.RESET_ALL).strip()
+            description = input(Fore.BLUE + Style.BRIGHT + 'What is the bot’s description [short] ? (or press ENTER to leave empty) ' + Style.RESET_ALL).strip()
             expertise = input(Fore.BLUE + Style.BRIGHT + 'What is the bot’s expertise? (or press ENTER to leave empty) ' + Style.RESET_ALL).strip()
             style = input(Fore.BLUE + Style.BRIGHT + 'Any specific style you want it to behave? (or press ENTER to leave empty) ' + Style.RESET_ALL).strip()
-
+ 
             # Create a dictionary for the current bot
             bot_details = {
                 'name': name_bot,
+                'description': description,
                 'expertise': expertise,
                 'style': style
             }
@@ -765,18 +813,38 @@ while True:
             print(f"Bot '{name_bot}' added successfully and saved to '{json_file_path}'.")
             bots_exist = True
 
-        if "list" in ui:
+        if "/list" in ui:
             if bots_list:
                 print("Bots list:")
                 max_name_length = max(len(bot['name']) for bot in bots_list) + 2
                 max_expertise_length = max(len(bot['expertise']) for bot in bots_list) + 2
+                max_description_length = max(len(bot['description']) for bot in bots_list) + 2
 
                 for index, bot in enumerate(bots_list, start=1):
                     name = bot['name'].ljust(max_name_length)
                     expertise = bot['expertise'].ljust(max_expertise_length)
-                    print(f"{index}. Name: {name} Expertise: {expertise} Style: {bot['style']}")
+                    description = bot['description'].ljust(max_description_length)
+                    print(f"{index}.{Fore.CYAN + Style.BRIGHT} Name:{Style.RESET_ALL} {name} "
+                          f"{Fore.GREEN + Style.BRIGHT}description:{Style.RESET_ALL} {description} "
+                          f"{Fore.MAGENTA + Style.BRIGHT}Expertise:{Style.RESET_ALL} {expertise} "
+                          f"{Fore.LIGHTRED_EX + Style.BRIGHT}Style:{Style.RESET_ALL} {bot['style']}")
+
             else:
                 print("No bots found.")
+        
+        if "/multi" in ui:
+            print("Multi-bot mode activated. you will recive respond from all bots exits")
+            multi = True
+            # user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would be the first qusetion to all bots?: ' + Style.RESET_ALL).strip()   
+            # ui=user_input2
+            continue
+        
+        if "/single" in ui:
+            print("Single-bot mode activated. you will recive respond from one bot")
+            multi = False
+            # user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would be the first qusetion?: ' + Style.RESET_ALL).strip()
+            # ui=user_input2
+            continue
 
         if "/image" in ui: 
             image_path=extract_filepic(ui)
