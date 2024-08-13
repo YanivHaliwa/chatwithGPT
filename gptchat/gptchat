@@ -20,14 +20,20 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import json
 import re
- 
+import shutil
 
-#version 13.8.24
+'''
+Author: Yaniv Haliwa
+-----
+Last Modified: Tuesday, 13th August 2024 10:21:34 pm
+'''
+
 
 colorama.init(autoreset=True)
 alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
 print(alert_message)
 
+  
 help_text = (
     f"{Fore.YELLOW}Welcome to the Interactive Chat and File Text Extraction Script!{Style.RESET_ALL}\n"
     f"This script leverages OpenAI's GPT for conversation and extracts text from specified files to facilitate dynamic interactions.\n\n"
@@ -495,11 +501,25 @@ def clear_files():
         pass         
     current_script = os.path.basename(__file__)
     files_in_directory = glob.glob('*')
-    files_to_keep = ['conversation.txt', current_script]
+    files_to_keep = ['conversation.txt', current_script,'bots_details.json']
     for file in files_in_directory:
         if file not in files_to_keep and os.path.isfile(file):
             os.remove(file)
-           
+
+    # Remove all files in the "files" directory
+    files_directory = "files"
+    if os.path.exists(files_directory) and os.path.isdir(files_directory):
+        for filename in os.listdir(files_directory):
+            file_path = os.path.join(files_directory, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.remove(file_path)  # Remove files and symbolic links
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)  # Remove directories and their contents
+            except Exception as e:
+                pass
+
+     
 def save_conversation(textadd):
     global conversation_log
     with open("conversation.txt", "a") as f:
@@ -722,7 +742,7 @@ while True:
             continue  
 
         if ui.strip() == "/clear":
-            confirm=input("this operation will clear all the conversation and delete all output files. are you sure? y/n\n")
+            confirm=input("this operation will clear all the conversation and delete all files. are you sure? y/n\n")
             if confirm.lower() == "y":
                 clear_files()
             continue
