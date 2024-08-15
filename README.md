@@ -46,6 +46,7 @@ A versatile chat interface with advanced file processing and image analysis capa
 - **Image processing with OCR and GPT-4 Vision integration**: Analyze images and extract relevant information.
 - **Custom bot creation with expertise and style**: Users can add special bots with custom expertise and communication styles. 
     GPT will automatically determine which bot should respond to the user's query based on the context.
+- **multi bots**: default is that gpt decide which special bot to answer. but its possible to activate /multi so all bots exist will respond to same input
 
 
 
@@ -65,6 +66,8 @@ python gptchat.py
 - `/tr [text]`: Translate the given text
 - `/add`: add user in bot lists
 - `/list`: list all existing bots in file
+- `/multi`: Get responses from all bots listed in the file. This can be disabled only by triggering the '/single' command.
+- `/single`:Get a response from only one bot, selected by the system.
 
 
 

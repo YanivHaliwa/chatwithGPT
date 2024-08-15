@@ -4,7 +4,7 @@ import os,sys,base64,time,re,requests,threading,glob,mimetypes,pytesseract,subpr
 import openai
 from openai import OpenAI
 import colorama
-from colorama import Fore, Style
+from colorama import Fore, Style as ColoramaStyle
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
@@ -22,43 +22,41 @@ import json
 import re
 import shutil
 
-'''
-Author: Yaniv Haliwa
------
-Last Modified: Tuesday, 13th August 2024 10:21:34 pm
-'''
+
+#version 16.8.24
 
 
 colorama.init(autoreset=True)
-alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{Style.RESET_ALL}\n"
+alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{ColoramaStyle.RESET_ALL}\n"
 print(alert_message)
-
+  
   
 help_text = (
-    f"{Fore.YELLOW}Welcome to the Interactive Chat and File Text Extraction Script!{Style.RESET_ALL}\n"
+    f"{Fore.YELLOW}Welcome to the Interactive Chat and File Text Extraction Script!{ColoramaStyle.RESET_ALL}\n"
     f"This script leverages OpenAI's GPT for conversation and extracts text from specified files to facilitate dynamic interactions.\n\n"
     
-    f"{Fore.CYAN}Special Commands:{Style.RESET_ALL}\n"
-    f"  {Fore.GREEN}/help{Style.RESET_ALL}  - Show this help message.\n\n"
-    f"  {Fore.GREEN}/exit{Style.RESET_ALL}  - Exit the script.\n\n"
-    f"  {Fore.GREEN}/clear{Style.RESET_ALL} - Clear all records from the conversation and output files\n\n" +
-    f"  {Fore.GREEN}/url{Style.RESET_ALL}   - If you mention 'url' and then link, then ask a question about it,\n"
+    f"{Fore.CYAN}Special Commands:{ColoramaStyle.RESET_ALL}\n"
+    f"  {Fore.GREEN}/help{ColoramaStyle.RESET_ALL}  - Show this help message.\n\n"
+    f"  {Fore.GREEN}/exit{ColoramaStyle.RESET_ALL}  - Exit the script.\n\n"
+    f"  {Fore.GREEN}/clear{ColoramaStyle.RESET_ALL} - Clear all records from the conversation and output files\n\n" +
+    f"  {Fore.GREEN}/show{ColoramaStyle.RESET_ALL} - show conversation history from file, in MD file format\n\n" +
+    f"  {Fore.GREEN}/url{ColoramaStyle.RESET_ALL}   - If you mention 'url' and then link, then ask a question about it,\n"
     f"          GPT will read the text from the URL and give a response accordingly.\n"
     f"          Example:\n"
     f"          url https://example.com explain me this article/summarize this article.\n"
-    f"          Important: {Style.BRIGHT}This option may not work on all websites!\n\n{Style.RESET_ALL}"
-    f"  {Fore.GREEN}/read{Style.RESET_ALL}  - Read the content of a specified file. Accepted file types are {Style.BRIGHT} txt, md, html, css, xml,\n"
-    f"           pdf, xls, xlsx, csv, py.\n{Style.RESET_ALL}"
-    f"          Example:\n"
-    f"          /read /path/to/your/file.txt\n\n"
-    f"  {Fore.GREEN}/translate{Style.RESET_ALL} - only translate next words without any exaplaintion.\n\n"
-    f"  {Fore.GREEN}/image{Style.RESET_ALL} - watch image file and answer question.\n\n"
-    f"  {Fore.GREEN}/readfiles{Style.RESET_ALL} - Read all supported files from the 'files' folder in the current directory.\n"
-    f"          Supported file types are: txt, md, html, css, xml, pdf, xls, xlsx, csv, py.\n\n"
-    f"  {Fore.GREEN}/add{Style.RESET_ALL} - add new bot to list.\n\n"
-    f"  {Fore.GREEN}/list{Style.RESET_ALL} - list all bots from file.\n\n"
-    f"  {Fore.GREEN}/multi{Style.RESET_ALL} - Get responses from all bots listed in the file. This can be disabled only by triggering the '/single' command. \n\n"
-    f"  {Fore.GREEN}/single{Style.RESET_ALL} - Get a response from only one bot, selected by the system. \n\n"
+    f"          Important: {ColoramaStyle.BRIGHT}This option may not work on all websites!\n\n{ColoramaStyle.RESET_ALL}"
+    f"  {Fore.GREEN}/read{ColoramaStyle.RESET_ALL}  - Read the content of a specified file. Accepted file types are {ColoramaStyle.BRIGHT} txt, md, html, css, xml,\n"
+    f"           pdf, xls, xlsx, csv, py.\n{ColoramaStyle.RESET_ALL}"
+    f"           Example:\n"
+    f"           /read /path/to/your/file.txt\n\n"
+    f"  {Fore.GREEN}/readfiles{ColoramaStyle.RESET_ALL} - Read multiple files, from the 'files' folder in the current directory.\n"
+    f"               Supported file types are same as in /read command.\n\n"
+    f"  {Fore.GREEN}/tr{ColoramaStyle.RESET_ALL} - only translate next words without any exaplaintion.\n\n"
+    f"  {Fore.GREEN}/image{ColoramaStyle.RESET_ALL} - watch image file and answer question.\n\n"
+    f"  {Fore.GREEN}/add{ColoramaStyle.RESET_ALL} - add new bot to list.\n\n"
+    f"  {Fore.GREEN}/list{ColoramaStyle.RESET_ALL} - list all bots from file.\n\n"
+    f"  {Fore.GREEN}/multi{ColoramaStyle.RESET_ALL} - Get responses from all bots listed in the file. This can be disabled only by triggering the '/single' command. \n\n"
+    f"  {Fore.GREEN}/single{ColoramaStyle.RESET_ALL} - Get a response from only one bot, selected by the system. \n\n"
 )
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -218,8 +216,8 @@ def get_analyse_bot(uinput):
             
         ],
         stream=True,
-        temperature=1,
-        max_tokens=100
+        temperature=0.7,
+        max_tokens=500
         )
         summary=""
         temptext=""
@@ -266,7 +264,7 @@ def get_analyse_bot(uinput):
 
     except KeyboardInterrupt:
         print("\n")   
-        inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+        inp = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'You want to exit? (y/n): ' + ColoramaStyle.RESET_ALL).strip()
         if inp.lower() == "y":
             print("Exiting...")
             sys.exit(1)    
@@ -274,29 +272,6 @@ def get_analyse_bot(uinput):
             print("Resuming...")
     return summary_string
 
-
-
-    # bot=""
-    # if bots_list:
-    #     bot_choose = get_analyse_bot(uinput)
-    #     for boti in bots_list:
-    #         if boti['name'] == bot_choose:
-    #             bot = boti
-    #             break
-    
-    # bot_text=""
-    # bot_name="BOT"
-    # if bot:
-    #     bot_name=f"{bot['name']} ({bot['description']})"
-    #     bot_text=f"""
-    #     your name is  {bot_name}, and your description duty as {bot['description']} and your expertise is {bot['expertise']},
-    #     and you must reponde in style  {bot['style']}
-    #     you consist to be  {bot_name} until you notice user go other topic then you dissmissed.
-    #     you might see bot names in this conversation log. dont mix which user and which bot you can identify this by read user log and bot log as below"""
-    #     lastbot=bot['name']   
-    # else:
-    #    lastbot=""
-    #    pass
 
 def get_bot_response(uinput):
     global temptext,uhistory,bhistory, conversation_log,terminal_log,file_text,lastbot
@@ -364,6 +339,7 @@ def get_bot_response(uinput):
                         {
                             'role': 'system',
                             'content': f'''
+                            
                             Your job is to serve the user for any help needed. You act as human and you act as if you have emotions and feelings. Don't ever mention you are AI.
                             Contact the user only by their name, if you know it. IF YOU DON'T KNOW THE NAME OF THE USER THEN DON'T MENTION ANY NAME.
                             dont confuse with bots names which is in this list: {bots_list} only remember what user tell u his name
@@ -371,8 +347,8 @@ def get_bot_response(uinput):
                             I want you to use proper visual response if it's more than one line.
                             I need you to be smart to separate lines and make paragraphs and headlines or follow by a, b, c or follow by 1, 2, 3. Use it wisely.
                             if you dont know specific info - just say you dont know. dont ever make up information. no illusion, you must be precise and accurate.
-                            
                             {filemsg}
+                            fit your respond in format of markdown file.
                             '''
                         },
                         {
@@ -394,44 +370,45 @@ def get_bot_response(uinput):
             ],
             stream=True,
             temperature=0.7,
-            max_tokens=100
+            max_tokens=2000
             )
             summary=""
             temptext=""
             ch=""
             finish=""
             print(f"\n{bot_name}: ", end="")
+            #handle_markdown_stream(response)
+            buffer = ""
             for chunk in response:
                 ch = chunk.choices[0]
                 txt=ch.delta.content
                 finish = ch.finish_reason
-            #  print(ch)
                 if txt:
                     temptext = txt
                     summary += temptext
-                    print(Fore.GREEN + temptext + Style.RESET_ALL, end="", flush=True)
-
-                # if finish:
-                #     if "length" in finish:
-                #         print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
-                #         summary = summary.strip().split("\n")
-                #         summary_string = "\n".join(summary)
-                #         texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-                #         conversation_log.append(texttoadd)
-                #         save_conversation(texttoadd)
-                #         uinput="read history u cut ur response continue  eaxctly where u left off" 
-                #         return get_bot_response(uinput)
-                #     elif "stop" in finish:
-                #         break
-                # elif finish==None and txt==None:
-                #     print(Fore.RED + "i was cut i will continue...\n" + Style.RESET_ALL)
-                #     summary = summary.strip().split("\n")
-                #     summary_string = "\n".join(summary)
-                #     texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-                #     conversation_log.append(texttoadd)
-                #     save_conversation(texttoadd)
-                #     uinput="read history u cut ur response continue  eaxctly where u left off" 
-                #     return get_bot_response(uinput)
+                    print(Fore.GREEN + temptext + ColoramaStyle.RESET_ALL, end="", flush=True)
+                
+                if finish:            
+                    if "length" in finish:
+                        print(Fore.RED + "i was cut i will continue...\n" + ColoramaStyle.RESET_ALL)
+                        summary = summary.strip().split("\n")
+                        summary_string = "\n".join(summary)
+                        texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                        conversation_log.append(texttoadd)
+                        save_conversation(texttoadd)
+                        uinput="read history u cut ur response continue  eaxctly where u left off" 
+                        return get_bot_response(uinput)
+                    elif "stop" in finish:
+                        break
+                elif finish==None and txt==None:
+                    print(Fore.RED + "i was cut i will continue...\n" + ColoramaStyle.RESET_ALL)
+                    summary = summary.strip().split("\n")
+                    summary_string = "\n".join(summary)
+                    texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                    conversation_log.append(texttoadd)
+                    save_conversation(texttoadd)
+                    uinput="read history u cut ur response continue  eaxctly where u left off" 
+                    return get_bot_response(uinput)
 
             print("\n")   
             summary = summary.strip().split("\n")
@@ -468,7 +445,7 @@ def get_bot_response(uinput):
 
         except KeyboardInterrupt:
             print("\n")   
-            inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+            inp = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'You want to exit? (y/n): ' + ColoramaStyle.RESET_ALL).strip()
             if inp.lower() == "y":
                 print("Exiting...")
                 sys.exit(1)    
@@ -481,8 +458,8 @@ def get_bot_response(uinput):
 
 def read_history():
     global conversation_log
-    if os.path.exists("conversation.txt"):
-        with open("conversation.txt", "r") as f:
+    if os.path.exists("conversation.md"):
+        with open("conversation.md", "r") as f:
             lines = f.readlines()
             if len(lines) > 1000:
                 lines = lines[-1000:]  
@@ -497,11 +474,11 @@ def clear_files():
     uhistory=[]
     bhistory=[]
     file_text=""
-    with open("conversation.txt", "w") as file:
+    with open("conversation.md", "w") as file:
         pass         
     current_script = os.path.basename(__file__)
     files_in_directory = glob.glob('*')
-    files_to_keep = ['conversation.txt', current_script,'bots_details.json']
+    files_to_keep = ['conversation.md', current_script,'bots_details.json']
     for file in files_in_directory:
         if file not in files_to_keep and os.path.isfile(file):
             os.remove(file)
@@ -522,7 +499,7 @@ def clear_files():
      
 def save_conversation(textadd):
     global conversation_log
-    with open("conversation.txt", "a") as f:
+    with open("conversation.md", "a") as f:
         f.write(textadd + "\n") 
       
 
@@ -601,7 +578,7 @@ def read_file(file):
                     soup = BeautifulSoup(f, 'html.parser')
                     # Remove all script and style elements
                     for script_or_style in soup(["script", "style"]):
-                        script_or_style.decompose()
+                        script_or_ColoramaStyle.decompose()
                     # Get text
                     text = soup.get_text()
                     # Break into lines and remove leading and trailing space on each
@@ -701,7 +678,7 @@ def setup_environment():
     # Define the paths
     script_dir = os.path.dirname(os.path.abspath(__file__))
     files_folder = os.path.join(script_dir, 'files')
-    conversation_file = os.path.join(script_dir, 'conversation.txt')
+    conversation_file = os.path.join(script_dir, 'conversation.md')
     bot_file = os.path.join(script_dir, 'bots_details.json')
 
     # Create 'files' folder if it doesn't exist
@@ -709,11 +686,11 @@ def setup_environment():
         os.makedirs(files_folder)
         print(f"Created 'files' folder at {files_folder}")
 
-    # Create conversation.txt if it doesn't exist
+    # Create conversation.md if it doesn't exist
     if not os.path.exists(conversation_file):
         with open(conversation_file, 'w') as f:
             f.write("")  # Create an empty file
-        print(f"Created 'conversation.txt' at {conversation_file}")
+        print(f"Created 'conversation.md' at {conversation_file}")
 
     if not os.path.exists(bot_file):
         with open(bot_file, 'w') as f:
@@ -730,7 +707,7 @@ while True:
         texttoadd=""
         ui=""
         user_input=""
-        user_input = input(Fore.BLUE+Style.BRIGHT+'You: '+Style.RESET_ALL)
+        user_input = input(Fore.BLUE+ColoramaStyle.BRIGHT+'You: '+ColoramaStyle.RESET_ALL)
         ui=user_input
         texttoadd=f"{timestamp} USER: {ui}"
     
@@ -756,7 +733,7 @@ while True:
                 indexed_chunks = index_file_contents(files_content)
                 
                 while True:
-                    user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would you like to know about these files? (or type "stop"): ' + Style.RESET_ALL).strip()
+                    user_input2 = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about these files? (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()
                     
                     if user_input2.lower() == 'stop':
                         file_text=[]
@@ -771,7 +748,7 @@ while True:
                     save_conversation(texttoadd)
                     
                     response = get_bot_response(ui)
-                    # print(Fore.GREEN + response + Style.RESET_ALL)
+                    # print(Fore.GREEN + response + ColoramaStyle.RESET_ALL)
             else:
                 print("No files were read or the 'files' folder is empty.")
             continue
@@ -797,7 +774,7 @@ while True:
             file_text=f"file name: {file}, content: {file_text}"
             if file_text:   
                 while True:             
-                    user_input2=input(Fore.BLUE + Style.BRIGHT + 'What would you like to know about these file?  (or type "stop"): ' + Style.RESET_ALL).strip()
+                    user_input2=input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about these file?  (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()
                     if user_input2.lower() == 'stop':
                          break
                     ui=f"read this file name: {file} question: {user_input2}"
@@ -807,10 +784,10 @@ while True:
                     response = get_bot_response(ui)
        
         if "/add" in ui:
-            name_bot = input(Fore.BLUE + Style.BRIGHT + 'What is the name of the bot? ' + Style.RESET_ALL).strip()
-            description = input(Fore.BLUE + Style.BRIGHT + 'What is the bot’s description [short] ? (or press ENTER to leave empty) ' + Style.RESET_ALL).strip()
-            expertise = input(Fore.BLUE + Style.BRIGHT + 'What is the bot’s expertise? (or press ENTER to leave empty) ' + Style.RESET_ALL).strip()
-            style = input(Fore.BLUE + Style.BRIGHT + 'Any specific style you want it to behave? (or press ENTER to leave empty) ' + Style.RESET_ALL).strip()
+            name_bot = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the name of the bot? ' + ColoramaStyle.RESET_ALL).strip()
+            description = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the bot’s description [short] ? (or press ENTER to leave empty) ' + ColoramaStyle.RESET_ALL).strip()
+            expertise = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the bot’s expertise? (or press ENTER to leave empty) ' + ColoramaStyle.RESET_ALL).strip()
+            style = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'Any specific style you want it to behave? (or press ENTER to leave empty) ' + ColoramaStyle.RESET_ALL).strip()
  
             # Create a dictionary for the current bot
             bot_details = {
@@ -844,10 +821,10 @@ while True:
                     name = bot['name'].ljust(max_name_length)
                     expertise = bot['expertise'].ljust(max_expertise_length)
                     description = bot['description'].ljust(max_description_length)
-                    print(f"{index}.{Fore.CYAN + Style.BRIGHT} Name:{Style.RESET_ALL} {name} "
-                          f"{Fore.GREEN + Style.BRIGHT}description:{Style.RESET_ALL} {description} "
-                          f"{Fore.MAGENTA + Style.BRIGHT}Expertise:{Style.RESET_ALL} {expertise} "
-                          f"{Fore.LIGHTRED_EX + Style.BRIGHT}Style:{Style.RESET_ALL} {bot['style']}")
+                    print(f"{index}.{Fore.CYAN + ColoramaStyle.BRIGHT} Name:{ColoramaStyle.RESET_ALL} {name} "
+                          f"{Fore.GREEN + ColoramaStyle.BRIGHT}description:{ColoramaStyle.RESET_ALL} {description} "
+                          f"{Fore.MAGENTA + ColoramaStyle.BRIGHT}Expertise:{ColoramaStyle.RESET_ALL} {expertise} "
+                          f"{Fore.LIGHTRED_EX + ColoramaStyle.BRIGHT}Style:{ColoramaStyle.RESET_ALL} {bot['style']}")
 
             else:
                 print("No bots found.")
@@ -855,14 +832,14 @@ while True:
         if "/multi" in ui:
             print("Multi-bot mode activated. you will recive respond from all bots exits")
             multi = True
-            # user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would be the first qusetion to all bots?: ' + Style.RESET_ALL).strip()   
+            # user_input2 = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would be the first qusetion to all bots?: ' + ColoramaStyle.RESET_ALL).strip()   
             # ui=user_input2
             continue
         
         if "/single" in ui:
             print("Single-bot mode activated. you will recive respond from one bot")
             multi = False
-            # user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would be the first qusetion?: ' + Style.RESET_ALL).strip()
+            # user_input2 = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would be the first qusetion?: ' + ColoramaStyle.RESET_ALL).strip()
             # ui=user_input2
             continue
 
@@ -870,7 +847,7 @@ while True:
             image_path=extract_filepic(ui)
             text_from_image = ocr_image(image_path)
             while True:
-                user_input2 = input(Fore.BLUE + Style.BRIGHT + 'What would you like to know about this image? (or type "stop"): ' + Style.RESET_ALL).strip()   
+                user_input2 = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about this image? (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()   
                 if user_input2.lower() == 'stop':
                      break
                 texttoadd=f"{timestamp} USER: IMAGE - {user_input2}" 
@@ -882,10 +859,10 @@ while True:
                 # Check if the response has 'choices' key and handle errors
                 if 'choices' in gpt4o_response:
                     summary = gpt4o_response['choices'][0]['message']['content']
-                    print(Fore.GREEN + summary+"\n" + Style.RESET_ALL, end="", flush=True)
+                    print(Fore.GREEN + summary+"\n" + ColoramaStyle.RESET_ALL, end="", flush=True)
                     print("")
                 else:
-                    print(Fore.RED + "Error in GPT-4o response:" + str(gpt4o_response) + Style.RESET_ALL)
+                    print(Fore.RED + "Error in GPT-4o response:" + str(gpt4o_response) + ColoramaStyle.RESET_ALL)
                     print("")
                 
                 texttoadd=f"{timestamp} BOT: {summary}\n"
@@ -895,10 +872,16 @@ while True:
 
         if "/tr" in ui:
             text=ui.replace("/tr", "")
-            texttoadd=f"{timestamp} USER: translate this {text}"
+            ui= f"translate this {text}"
+            texttoadd=f"{timestamp} USER: translate only this text:  {text}"
+        
+        if "/show" in ui:
+            command = ["glow", "conversation.md"]
+            subprocess.run(command) 
             continue
 
-        if ("image" not in ui) and ("read" not in ui) and ("readfiles" not in ui) and ("add" not in ui) and ("list" not in ui):
+        keywords = ["image", "read", "readfiles", "add", "list", "show"]    
+        if all(keyword not in ui for keyword in keywords):
             conversation_log.append(texttoadd)
             save_conversation(texttoadd)
             response = get_bot_response(ui)
@@ -907,7 +890,7 @@ while True:
     except KeyboardInterrupt:
         print("\n")   
         try:
-            inp = input(Fore.BLUE + Style.BRIGHT + 'You want to exit? (y/n): ' + Style.RESET_ALL).strip()
+            inp = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'You want to exit? (y/n): ' + ColoramaStyle.RESET_ALL).strip()
             if inp.lower() == "y":
                 print("Exiting...")
                 break  
