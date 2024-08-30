@@ -163,11 +163,14 @@ def extract_text_from_url(url, output_dir):
         title = re.sub('[\W_]+', '_', title)
 
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        output_dir = os.path.join(output_dir, 'files')
+        
         filename = f"{title}_{timestamp}.txt"
+        full_path = os.path.join(output_dir, filename)
 
-        with open(os.path.join(output_dir, filename), 'w') as f:
+        with open(full_path, 'w') as f:
             f.write(text)
-        return filename
+        return full_path
 
     except HTTPError as http_err:
         print(f"HTTP error occurred: {http_err}") 
@@ -753,18 +756,28 @@ while True:
                 print("No files were read or the 'files' folder is empty.")
             continue
 
-        if "/url" in ui:        
+        if "/url" in ui:  
+            # filename="" 
+            # urls=""
+            # files_content=""   
             url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
             urls = re.findall(url_pattern, user_input)
             filename=extract_text_from_url(urls[0],os.getcwd())
+           # print(filename)
             if filename:
-                print("got url")
-                with open(os.path.join(os.getcwd(), filename), "r") as f:
-                    file_content = f.read()
-                ui = ui.replace(urls[0], file_content)
-                ui = ui.replace("/url", "")
-                texttoadd=f"{timestamp} USER: {ui}"
-               
+                with open(filename, "r") as f:
+                    file_text = f.read()
+                while True:             
+                    user_input2=input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about these website?  (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()
+                    if user_input2.lower() == 'stop':
+                         file_text=[]
+                         break
+                    ui=f"read this file name: {file_text} \n its from website {filename} \n question of user: {user_input2}"
+                    texttoadd= f"{timestamp} USER: {ui}"  
+                    conversation_log.append(texttoadd)
+                    save_conversation(texttoadd)
+                    response = get_bot_response(ui)
+
             else:
                 continue
 
@@ -776,6 +789,7 @@ while True:
                 while True:             
                     user_input2=input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about these file?  (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()
                     if user_input2.lower() == 'stop':
+                         file_text=[]
                          break
                     ui=f"read this file name: {file} question: {user_input2}"
                     texttoadd= f"{timestamp} USER: {ui}"  
@@ -880,8 +894,9 @@ while True:
             subprocess.run(command) 
             continue
 
-        keywords = ["image", "read", "readfiles", "add", "list", "show"]    
+        keywords = ["image", "read", "readfiles", "add", "list", "show","url","multi","single"]    
         if all(keyword not in ui for keyword in keywords):
+            file_text=[]
             conversation_log.append(texttoadd)
             save_conversation(texttoadd)
             response = get_bot_response(ui)
