@@ -22,9 +22,12 @@ import json
 import re
 import shutil
 
-
-#version 16.8.24
-
+'''
+Author: Yaniv Haliwa
+https://github.com/YanivHaliwa
+-----
+Last Modified: 30.08.2024 at 16:20
+'''
 
 colorama.init(autoreset=True)
 alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{ColoramaStyle.RESET_ALL}\n"
@@ -362,7 +365,8 @@ def get_bot_response(uinput):
                             but you not limited to our conversation only you can answer question from your knowledge.
                             if i tell you to remember what you said before in conversation i mean to this: {bhistory}
                             if i tell you to remember what user or me said i mean this: {uhistory}
-                            therefore you need to use this info to contact user by his name only.    
+                            therefore you need to use this info to contact user by his name only.  
+                            if you want to know what this program can do with you read the help command which is this {help_text} you can sugest user from that 
                             '''
                         },
                         {
@@ -846,15 +850,13 @@ while True:
         if "/multi" in ui:
             print("Multi-bot mode activated. you will recive respond from all bots exits")
             multi = True
-            # user_input2 = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would be the first qusetion to all bots?: ' + ColoramaStyle.RESET_ALL).strip()   
-            # ui=user_input2
+           
             continue
         
         if "/single" in ui:
             print("Single-bot mode activated. you will recive respond from one bot")
             multi = False
-            # user_input2 = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would be the first qusetion?: ' + ColoramaStyle.RESET_ALL).strip()
-            # ui=user_input2
+           
             continue
 
         if "/image" in ui: 
@@ -894,7 +896,7 @@ while True:
             subprocess.run(command) 
             continue
 
-        keywords = ["image", "read", "readfiles", "add", "list", "show","url","multi","single"]    
+        keywords = ["/image", "/read", "/readfiles", "/add", "/list", "/show","/url","/multi","/single"]    
         if all(keyword not in ui for keyword in keywords):
             file_text=[]
             conversation_log.append(texttoadd)
