@@ -31,7 +31,8 @@ help_text = (
     f"This script is designed to use GPT to suggest,process, execute Linux commands based on user input.\n\n"
     f"{Fore.CYAN}Options:{Style.RESET_ALL}\n"
     f"  {Fore.GREEN}/help{Style.RESET_ALL}               - Show this help message.\n"
-    f"  {Fore.GREEN}exit{Style.RESET_ALL}                - Exit the script.\n"    
+    f"  {Fore.GREEN}/exit{Style.RESET_ALL}                - Exit the script.\n"    
+    f"  {Fore.GREEN}/clear{Style.RESET_ALL} - Clear all records from the conversation and output files\n\n" +
     f"{Fore.RED}Important Notes:{Style.RESET_ALL}\n"
     f"- Use caution when executing suggested commands, especially those prefixed with {Fore.RED}sudo{Style.RESET_ALL}.\n\n"
     )
@@ -119,6 +120,7 @@ def get_bot_response(uinput):
                 5. if you dont know the location or name file - then add command to figure it out.
                 6. when you need to do give respond of search or similiar command always redirect error output to null
                 7. if its command that probably need permission -then you must add 'sudo' to your command.
+                8. do not repeat commands if you did already in the last response. if user humor your with not commands question then answer him in command only with humor way
 
                 '''
             },
@@ -140,7 +142,7 @@ def get_bot_response(uinput):
             
         ],
         stream=True,
-        temperature=1,
+        temperature=0.7,
         max_tokens=500
         )
         summary=""
@@ -215,7 +217,7 @@ def conv():
             user_input = input(Fore.BLUE + Style.BRIGHT + 'You: ' + Style.RESET_ALL).strip()
             ui=user_input.lower()
 
-            if ui == "exit":
+            if ui == "/exit":
                 break
 
             if ui == "/help":

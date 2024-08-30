@@ -719,7 +719,7 @@ while True:
             continue  
 
         if ui.strip() == "/clear":
-            confirm=input("this operation will clear all the conversation and delete all files. are you sure? y/n\n")
+            confirm=input("this operation will clear all the conversation and delete all files.\nare you sure? (y/n): ")
             if confirm.lower() == "y":
                 clear_files()
             continue
