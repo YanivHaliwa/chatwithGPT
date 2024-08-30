@@ -43,7 +43,7 @@ help_text = (
     f"  {Fore.GREEN}/url{ColoramaStyle.RESET_ALL}   - If you mention 'url' and then link, then ask a question about it,\n"
     f"          GPT will read the text from the URL and give a response accordingly.\n"
     f"          Example:\n"
-    f"          url https://example.com explain me this article/summarize this article.\n"
+    f"          url https://example.com\n"
     f"          Important: {ColoramaStyle.BRIGHT}This option may not work on all websites!\n\n{ColoramaStyle.RESET_ALL}"
     f"  {Fore.GREEN}/read{ColoramaStyle.RESET_ALL}  - Read the content of a specified file. Accepted file types are {ColoramaStyle.BRIGHT} txt, md, html, css, xml,\n"
     f"           pdf, xls, xlsx, csv, py.\n{ColoramaStyle.RESET_ALL}"
