@@ -163,7 +163,7 @@ def extract_text_from_url(url, output_dir):
         text = '\n'.join(chunk for chunk in chunks if chunk)
 
         title = soup.title.string if soup.title else "default_title"  # use "default_title" if title is None
-        title = re.sub('[\W_]+', '_', title)
+        title = re.sub(r'[\W_]+', '_', title)
 
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
         output_dir = os.path.join(output_dir, 'files')
@@ -280,7 +280,7 @@ def get_analyse_bot(uinput):
 
 
 def get_bot_response(uinput):
-    global temptext,uhistory,bhistory, conversation_log,terminal_log,file_text,lastbot
+    global temptext,uhistory,bhistory, conversation_log,terminal_log,file_text,lastbot,tr
     summary_string=""
     bot_name = "BOT"
     bots_to_use = []
@@ -328,6 +328,7 @@ def get_bot_response(uinput):
         summary_string=""
         temptext=""
         filemsg=""
+        trmsg=""
        # print ("text: \n",bot_text)
         try:
             if file_text:
@@ -339,6 +340,17 @@ def get_bot_response(uinput):
                     3. read it again and again to be sure that you answer only from this source only. and not from your knowledge. 
                     content of file is here:  {file_text}
                     '''
+            if tr:
+                print("translate only..\n")
+                trmsg = f'''
+                user gave you words to translate. you translator only. you must:
+                1. understand the words and context of the words
+                2. you must answer only the translation nothing else. not explain not details
+                do not make "markdown" and no titles just simple translate only
+                you need to be smart - if user words hebrew then respond translate to english
+                if user words english then respond translate to hebrew
+                
+                '''
             response = client.chat.completions.create(
             model=modelSource,
             messages=[
@@ -354,6 +366,7 @@ def get_bot_response(uinput):
                             I need you to be smart to separate lines and make paragraphs and headlines or follow by a, b, c or follow by 1, 2, 3. Use it wisely.
                             if you dont know specific info - just say you dont know. dont ever make up information. no illusion, you must be precise and accurate.
                             {filemsg}
+                            {trmsg}
                             fit your respond in format of markdown file.
                             '''
                         },
@@ -711,6 +724,7 @@ read_history()
 uhistory, bhistory = process_conversation_log(conversation_log,bots_list)
 while True:
     try:   
+        tr=False
         texttoadd=""
         ui=""
         user_input=""
@@ -718,20 +732,20 @@ while True:
         ui=user_input
         texttoadd=f"{timestamp} USER: {ui}"
     
-        if ui.strip() == "/exit":
+        if ui.strip() == "/exit" or ui.strip() == "exit":
             break      
             
-        if ui.strip() == "/help":
+        if ui.strip() == "/help" or ui.strip() == "help":
             print(help_text)   
             continue  
 
-        if ui.strip() == "/clear":
+        if ui.strip() == "/clear" or ui.strip() == "clear":
             confirm=input("this operation will clear all the conversation and delete all files.\nare you sure? (y/n): ")
             if confirm.lower() == "y":
                 clear_files()
             continue
 
-        if ui.strip() == "/readfiles":
+        if ui.strip() == "/readfiles" or ui.strip() == "readfiles":
             print("Reading files from the 'files' folder...")
             files_content = read_files_from_folder()
             if files_content:
@@ -801,7 +815,7 @@ while True:
                     save_conversation(texttoadd)
                     response = get_bot_response(ui)
        
-        if "/add" in ui:
+        if ui.strip() =="/add"  or ui.strip() == "add":
             name_bot = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the name of the bot? ' + ColoramaStyle.RESET_ALL).strip()
             description = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the bot’s description [short] ? (or press ENTER to leave empty) ' + ColoramaStyle.RESET_ALL).strip()
             expertise = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the bot’s expertise? (or press ENTER to leave empty) ' + ColoramaStyle.RESET_ALL).strip()
@@ -827,8 +841,9 @@ while True:
 
             print(f"Bot '{name_bot}' added successfully and saved to '{json_file_path}'.")
             bots_exist = True
+            continue
 
-        if "/list" in ui:
+        if ui.strip() == "/list" or ui.strip() == "list":
             if bots_list:
                 print("Bots list:")
                 max_name_length = max(len(bot['name']) for bot in bots_list) + 2
@@ -846,17 +861,16 @@ while True:
 
             else:
                 print("No bots found.")
+            continue 
         
-        if "/multi" in ui:
+        if ui.strip() == "/multi" or ui.strip() == "multi":
             print("Multi-bot mode activated. you will recive respond from all bots exits")
             multi = True
-           
             continue
         
-        if "/single" in ui:
+        if ui.strip() == "/single" or ui.strip() == "single":
             print("Single-bot mode activated. you will recive respond from one bot")
-            multi = False
-           
+            multi = False    
             continue
 
         if "/image" in ui: 
@@ -889,14 +903,15 @@ while True:
         if "/tr" in ui:
             text=ui.replace("/tr", "")
             ui= f"translate this {text}"
-            texttoadd=f"{timestamp} USER: translate only this text:  {text}"
+            tr=True
+            texttoadd=f"{timestamp} USER: translate this text:  {text}"
         
-        if "/show" in ui:
+        if ui.strip() == "/show" or ui.strip() == "show":
             command = ["glow", "conversation.md"]
             subprocess.run(command) 
             continue
 
-        keywords = ["/image", "/read", "/readfiles", "/add", "/list", "/show","/url","/multi","/single"]    
+        keywords = ["/image", "/read", "/readfiles", "/url"]    
         if all(keyword not in ui for keyword in keywords):
             file_text=[]
             conversation_log.append(texttoadd)
