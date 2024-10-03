@@ -21,12 +21,6 @@ import json
 import re
 import shutil
 
-'''
-Author: Yaniv Haliwa
-https://github.com/YanivHaliwa
------
-Last Modified: 30.08.2024 at 16:20
-'''
 
 colorama.init(autoreset=True)
 alert_message = f"{Fore.YELLOW}Type {Fore.LIGHTCYAN_EX}/help{Fore.YELLOW} at any time for information on how to use the commands.{ColoramaStyle.RESET_ALL}\n"
@@ -63,8 +57,8 @@ help_text = (
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
 modelSource = "gpt-4o"
+
 # global conversation_log,file_text,uhistory,bhistory,filename
 conversation_log =[]
 file_text=[]
