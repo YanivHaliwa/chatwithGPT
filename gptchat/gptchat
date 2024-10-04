@@ -53,11 +53,12 @@ help_text = (
     f"  {Fore.GREEN}/list{ColoramaStyle.RESET_ALL} - list all bots from file.\n\n"
     f"  {Fore.GREEN}/multi{ColoramaStyle.RESET_ALL} - Get responses from all bots listed in the file. This can be disabled only by triggering the '/single' command. \n\n"
     f"  {Fore.GREEN}/single{ColoramaStyle.RESET_ALL} - Get a response from only one bot, selected by the system. \n\n"
+    f" {Fore.GREEN}/readreq{ColoramaStyle.RESET_ALL} - read scripts files and make a list of requirements.\n\n"
 )
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 openai.api_key = os.getenv("OPENAI_API_KEY")
-modelSource = "gpt-4o"
+modelSource = "gpt-4-turbo"
 
 # global conversation_log,file_text,uhistory,bhistory,filename
 conversation_log =[]
@@ -71,6 +72,7 @@ filename=""
 CHUNK_SIZE = 1024  
 texttoadd=""
 lastbot=""
+req=False
 
 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
  
@@ -322,17 +324,39 @@ def get_bot_response(uinput):
         temptext=""
         filemsg=""
         trmsg=""
+        reqmsg=""
        # print ("text: \n",bot_text)
         try:
             if file_text:
-                    print("respond from files..\n")
-                    filemsg = f'''
-                    user gave you book file text to read. you must:
-                    1. read above the last file he give u 
-                    2. you must answer only from that book. 
-                    3. read it again and again to be sure that you answer only from this source only. and not from your knowledge. 
-                    content of file is here:  {file_text}
-                    '''
+                    if req:
+                        reqmsg=f"""
+                            the content user give you it could be python or bash script. i need you read carefully each file deeply.
+                            for each file you need:
+                            1. find the imports in the top - idenitfy the pip package which is default and which need to be install by pip
+                                you gonna gather only import that need to be install by pip  NOT DEFAULT IMPORT
+                            2. i might use some maniplation in this files to excute shell command that could be by : os, subprocess, sh, pexpect, Fabric, Plumbum. 
+                            you need to read all the script to identify which command i use with this tools. 
+                            if the command its not default by linuz and need to be installed - you gonna collect it too
+                            gather only shell commands that need to be install NOT DEFAULT PACKAGE. 
+                            in summary you gonna give user list of pip package or apt package that need to be installed before using this script 
+                            the format of ur answer will be:
+                            package1 
+                            package2
+                            package3
+                            etc......
+                            DO NOT MAKE SHORTCUT READ ALL SCRIPTS EACH ONE UNTIL THE END. to get the full needed scripts. from each file
+                            no need summary about the file. and no need to mention if none packs needed!
+                            i need in the end one list for all files. without mention for which file. dont add to list the none needed
+                            """
+                    else:
+                        print("respond from files..\n")
+                        filemsg = f'''
+                        user gave you book file text to read. you must:
+                        1. read above the last file he give u 
+                        2. you must answer only from that book. 
+                        3. read it again and again to be sure that you answer only from this source only. and not from your knowledge. 
+                        content of file is here:  {file_text}
+                        '''
             if tr:
                 print("translate only..\n")
                 trmsg = f'''
@@ -344,6 +368,7 @@ def get_bot_response(uinput):
                 if user words english then respond translate to hebrew
                 
                 '''
+            
             response = client.chat.completions.create(
             model=modelSource,
             messages=[
@@ -360,6 +385,7 @@ def get_bot_response(uinput):
                             if you dont know specific info - just say you dont know. dont ever make up information. no illusion, you must be precise and accurate.
                             {filemsg}
                             {trmsg}
+                            {reqmsg}
                             fit your respond in format of markdown file.
                             '''
                         },
@@ -389,7 +415,8 @@ def get_bot_response(uinput):
             temptext=""
             ch=""
             finish=""
-            print(f"\n{bot_name}: ", end="")
+            if not req:
+                print(f"\n{bot_name}: ", end="")
             #handle_markdown_stream(response)
             buffer = ""
             for chunk in response:
@@ -399,7 +426,8 @@ def get_bot_response(uinput):
                 if txt:
                     temptext = txt
                     summary += temptext
-                    print(Fore.GREEN + temptext + ColoramaStyle.RESET_ALL, end="", flush=True)
+                    if not req:
+                        print(Fore.GREEN + temptext + ColoramaStyle.RESET_ALL, end="", flush=True)
                 
                 if finish:            
                     if "length" in finish:
@@ -422,13 +450,14 @@ def get_bot_response(uinput):
                     save_conversation(texttoadd)
                     uinput="read history u cut ur response continue  eaxctly where u left off" 
                     return get_bot_response(uinput)
-
-            print("\n")   
+            if not req:
+                print("\n")   
             summary = summary.strip().split("\n")
             summary_string = "\n".join(summary)
-            texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-            conversation_log.append(texttoadd)
-            save_conversation(texttoadd)
+            if not req:
+                texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                conversation_log.append(texttoadd)
+                save_conversation(texttoadd)
             first_bot= False
 
         except openai.APIError as e:
@@ -541,7 +570,7 @@ def read_file(file):
     global file_text  # Declare the global variable
     file_text = []  # Ensure file_text is reset each time this function is called
     
-    print(f"Checking if file exists: {os.path.exists(file)}")  # Debugging line
+   # print(f"Checking if file exists: {os.path.exists(file)}")  # Debugging line
     if os.path.exists(file): 
         file_extension = Path(file).suffix.lower()
         if file_extension.strip()=="" and is_binary(file):
@@ -738,6 +767,49 @@ while True:
                 clear_files()
             continue
 
+        if ui.strip() == "/readforeq" or ui.strip() == "readforeq":
+                req=True
+                print("Reading files from the 'files' folder...")
+                files_content = read_files_from_folder()
+                #print (files_content)
+                if files_content:
+                    print(f"Read {len(files_content)} files successfully.")    
+                    all_responses = []              
+                    # Loop through each file in the list
+                    for file_data in files_content:
+                        file_name = file_data['name']  # Get the name of the file
+                        file_content = file_data['content']  # Get the content of the file
+                        ui=f"""you gonna get all requiremnts of pip or apt from this script file. need to read all the script until the end
+                               filename: {file_name} content: {file_content}
+                               no need summary about the file. and no need to mention if none packs needed!
+                               i need in the end one list for all files. without mention for which file. dont add to list the none needed
+                               """
+                        response = get_bot_response(ui)
+                        all_responses.append(f"Filename: {file_name}\nResponse: {response}\n")
+
+                    ui_summary = """Here all your responses for all the files. NO NEED SUMMARY ABOUT EACH FILE. just give me the final needed list for all files
+                    lists and avoid duplicate
+                    no need summary about the file. and no need to mention if none packs needed!
+                    i need in the end one list for all files. without mention for which file. dont add to list the none needed
+                    """ 
+                    combined_responses = "\n".join(all_responses)
+                    print(Fore.GREEN + combined_responses + ColoramaStyle.RESET_ALL, end="", flush=True)
+                    # Send the combined responses to the bot for summarization
+                    summary_prompt = f"{ui_summary}\n\n{combined_responses}"
+                    summary_response = get_bot_response(summary_prompt)
+                    texttoadd = f"{timestamp} USER: get all requiremnts of pip or apt from this script files"
+                    conversation_log.append(texttoadd)
+                    save_conversation(texttoadd)
+                    texttoadd = f"{timestamp} BOT: {combined_responses}"
+                    conversation_log.append(texttoadd)
+                    save_conversation(texttoadd)
+                    file_text=[]
+                    req=False
+                        
+                else:
+                    print("No files were read or the 'files' folder is empty.")
+                continue
+
         if ui.strip() == "/readfiles" or ui.strip() == "readfiles":
             print("Reading files from the 'files' folder...")
             files_content = read_files_from_folder()
@@ -755,7 +827,7 @@ while True:
                    
                     relevant_chunks = get_most_relevant_chunks(user_input2, indexed_chunks)
                     relevant_content = "\n\n".join([f"File: {chunk['file_name']}, Chunk: {chunk['chunk_id']}\nContent: {chunk['content']}" for chunk in relevant_chunks])
-                    
+                    file_text.append(relevant_content)
                     ui = f"Based on the following relevant content from the files:\n\n{relevant_content}\n\nPlease answer this question: {user_input2}"
                     texttoadd = f"{timestamp} USER: {ui}"
                     conversation_log.append(texttoadd)
@@ -765,6 +837,25 @@ while True:
                     # print(Fore.GREEN + response + ColoramaStyle.RESET_ALL)
             else:
                 print("No files were read or the 'files' folder is empty.")
+            continue
+        
+        if "/read" in ui:
+            file=extract_filename(ui)
+            file_text=read_file(file)
+            file_text=f"file name: {file}, content: {file_text}"
+            if file_text:   
+                while True:             
+                    user_input2=input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about these file?  (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()
+                    if user_input2.lower() == 'stop':
+                         file_text=[]
+                         break
+                    ui=f"read this file name: {file} question: {user_input2}"
+                    texttoadd= f"{timestamp} USER: {ui}"  
+                    conversation_log.append(texttoadd)
+                    save_conversation(texttoadd)
+                    response = get_bot_response(ui)
+            else:
+                continue
             continue
 
         if "/url" in ui:  
@@ -796,24 +887,6 @@ while True:
                 continue
             continue
 
-        if "/read" in ui:
-            file=extract_filename(ui)
-            file_text=read_file(file)
-            file_text=f"file name: {file}, content: {file_text}"
-            if file_text:   
-                while True:             
-                    user_input2=input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What would you like to know about these file?  (or type "stop"): ' + ColoramaStyle.RESET_ALL).strip()
-                    if user_input2.lower() == 'stop':
-                         file_text=[]
-                         break
-                    ui=f"read this file name: {file} question: {user_input2}"
-                    texttoadd= f"{timestamp} USER: {ui}"  
-                    conversation_log.append(texttoadd)
-                    save_conversation(texttoadd)
-                    response = get_bot_response(ui)
-            else:
-                continue
-            continue
        
         if ui.strip() =="/add"  or ui.strip() == "add":
             name_bot = input(Fore.BLUE + ColoramaStyle.BRIGHT + 'What is the name of the bot? ' + ColoramaStyle.RESET_ALL).strip()
