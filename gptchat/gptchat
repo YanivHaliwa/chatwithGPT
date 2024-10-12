@@ -767,11 +767,10 @@ while True:
                 clear_files()
             continue
 
-        if ui.strip() == "/readforeq" or ui.strip() == "readforeq":
+        if ui.strip() == "/readreq" or ui.strip() == "readreq":
                 req=True
                 print("Reading files from the 'files' folder...")
                 files_content = read_files_from_folder()
-                #print (files_content)
                 if files_content:
                     print(f"Read {len(files_content)} files successfully.")    
                     all_responses = []              
@@ -779,18 +778,17 @@ while True:
                     for file_data in files_content:
                         file_name = file_data['name']  # Get the name of the file
                         file_content = file_data['content']  # Get the content of the file
-                        ui=f"""you gonna get all requiremnts of pip or apt from this script file. need to read all the script until the end
-                               filename: {file_name} content: {file_content}
-                               no need summary about the file. and no need to mention if none packs needed!
-                               i need in the end one list for all files. without mention for which file. dont add to list the none needed
-                               """
+                        ui=f"""read this filename: {file_name} content: {file_content}
+                            1. which pips i install for this script?
+                            2. which shell commands i use in this script?      
+                            """
                         response = get_bot_response(ui)
                         all_responses.append(f"Filename: {file_name}\nResponse: {response}\n")
 
-                    ui_summary = """Here all your responses for all the files. NO NEED SUMMARY ABOUT EACH FILE. just give me the final needed list for all files
-                    lists and avoid duplicate
-                    no need summary about the file. and no need to mention if none packs needed!
-                    i need in the end one list for all files. without mention for which file. dont add to list the none needed
+                    ui_summary = """Here all your responses for all the files. NO NEED SUMMARY ABOUT EACH FILE. 
+                    i want u tell me 
+                            1. which pips i install for all those script?
+                            2. which shell commands i use in all those script?    
                     """ 
                     combined_responses = "\n".join(all_responses)
                     print(Fore.GREEN + combined_responses + ColoramaStyle.RESET_ALL, end="", flush=True)
@@ -841,6 +839,10 @@ while True:
         
         if "/read" in ui:
             file=extract_filename(ui)
+            if file is None:
+                print("Invalid command format.")
+                continue
+
             file_text=read_file(file)
             file_text=f"file name: {file}, content: {file_text}"
             if file_text:   
