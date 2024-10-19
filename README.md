@@ -8,6 +8,9 @@ This repository contains a suite of powerful Python-based tools that leverage Op
 2. **GPT for Python (gptpy)**
 3. **Linux Command Expert ChatBot (gptshell)**
 
+for more scripts using GPT for translation and subtitle check here: [Subtitle Management Tools section in the main README](https://github.com/YanivHaliwa/Linux-Stuff/tree/master?tab=readme-ov-file#subtitle-management-tools).
+
+
 ## Common Features
 
 - Utilizes OpenAI's GPT-4 model for intelligent responses
@@ -111,6 +114,7 @@ python gptshell.py
 #### Special Commands:
 - `/help`: Show help message
 - `exit`: Exit the script
+
 
 ## Notes
 
