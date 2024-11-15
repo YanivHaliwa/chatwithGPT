@@ -58,7 +58,7 @@ help_text = (
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 openai.api_key = os.getenv("OPENAI_API_KEY")
-modelSource = "gpt-4-turbo"
+modelSource = "gpt-4o"
 
 # global conversation_log,file_text,uhistory,bhistory,filename
 conversation_log =[]
