@@ -58,7 +58,7 @@ help_text = (
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 openai.api_key = os.getenv("OPENAI_API_KEY")
-modelSource = "gpt-4o"
+modelSource = "o3-mini-2025-01-31"
 
 # global conversation_log,file_text,uhistory,bhistory,filename
 conversation_log =[]
@@ -192,24 +192,29 @@ def get_analyse_bot(uinput):
         response = client.chat.completions.create(
         model=modelSource,
         messages=[
+                    
                     {
-                        'role': 'system',
-                        'content': f'''
-                         your job here only to determine by user input which best bot to respond. 
-                         your respond will be only 1 word of bot name as you decide. not other exaplain not other words
-                         in case you dont see anything fit for context - responde "BOT" which is the default bot
-                         list of bots and there expertis is here {bots_list}
-                         DO NOT CHOOSE LAST BOT AS DEFAULT only use the context and choose bot wisely
-                         you also must understand the last conversation to detetermine if need to continue with last bot or not 
-                         the full conversation is here {conversation_log} 
-                         also u need to remember the last bot respond is {lastbot} but you call it.
-                         in case u need understand user history last say to understand context its here: {uhistory}
-                         in case u need understand last bot history its here {bhistory}
-                         DO NOT BASE always ON LAST INTERACTION IN history to determine which bot he want now. 
-                         if user ask simple stuff without any expertise and no connection to any bot then dont choose him 
-                          '''
-                    },
-                   
+                        "role": "developer",
+                        "content": [
+                            {
+                            "type": "text",
+                            "text": f'''
+                            your job here only to determine by user input which best bot to respond. 
+                            your respond will be only 1 word of bot name as you decide. not other exaplain not other words
+                            in case you dont see anything fit for context - responde "BOT" which is the default bot
+                            list of bots and there expertis is here {bots_list}
+                            DO NOT CHOOSE LAST BOT AS DEFAULT only use the context and choose bot wisely
+                            you also must understand the last conversation to detetermine if need to continue with last bot or not 
+                            the full conversation is here {conversation_log} 
+                            also u need to remember the last bot respond is {lastbot} but you call it.
+                            in case u need understand user history last say to understand context its here: {uhistory}
+                            in case u need understand last bot history its here {bhistory}
+                            DO NOT BASE always ON LAST INTERACTION IN history to determine which bot he want now. 
+                            if user ask simple stuff without any expertise and no connection to any bot then dont choose him 
+                            ''' 
+                            }
+                        ]
+                        },
                     {
                         "role": "user",
                         "content": uinput
@@ -217,8 +222,9 @@ def get_analyse_bot(uinput):
             
         ],
         stream=True,
-        temperature=0.7,
-        max_tokens=500
+        reasoning_effort="high",
+        # temperature=0.7,
+        max_completion_tokens=500,
         )
         summary=""
         temptext=""
@@ -372,10 +378,13 @@ def get_bot_response(uinput):
             response = client.chat.completions.create(
             model=modelSource,
             messages=[
+                        
                         {
-                            'role': 'system',
-                            'content': f'''
-                            
+                            "role": "developer",
+                            "content": [
+                            {
+                            "type": "text",
+                            "text":  f'''               
                             Your job is to serve the user for any help needed. You act as human and you act as if you have emotions and feelings. Don't ever mention you are AI.
                             Contact the user only by their name, if you know it. IF YOU DON'T KNOW THE NAME OF THE USER THEN DON'T MENTION ANY NAME.
                             dont confuse with bots names which is in this list: {bots_list} only remember what user tell u his name
@@ -387,7 +396,10 @@ def get_bot_response(uinput):
                             {trmsg}
                             {reqmsg}
                             fit your respond in format of markdown file.
+                            before u say your respond i want you to summarize your chain of thought. then actual responde it. 
                             '''
+                            }
+                            ]
                         },
                         {
                             'role': 'assistant',
@@ -399,6 +411,7 @@ def get_bot_response(uinput):
                             if i tell you to remember what user or me said i mean this: {uhistory}
                             therefore you need to use this info to contact user by his name only.  
                             if you want to know what this program can do with you read the help command which is this {help_text} you can sugest user from that 
+
                             '''
                         },
                         {
@@ -408,8 +421,9 @@ def get_bot_response(uinput):
                 
             ],
             stream=True,
-            temperature=0.7,
-            max_tokens=2000
+            reasoning_effort="high",
+          # temperature=0.7,
+            max_completion_tokens=2000,
             )
             summary=""
             temptext=""
@@ -429,27 +443,27 @@ def get_bot_response(uinput):
                     if not req:
                         print(Fore.GREEN + temptext + ColoramaStyle.RESET_ALL, end="", flush=True)
                 
-                if finish:            
-                    if "length" in finish:
-                        print(Fore.RED + "i was cut i will continue...\n" + ColoramaStyle.RESET_ALL)
-                        summary = summary.strip().split("\n")
-                        summary_string = "\n".join(summary)
-                        texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-                        conversation_log.append(texttoadd)
-                        save_conversation(texttoadd)
-                        uinput="read history u cut ur response continue  eaxctly where u left off" 
-                        return get_bot_response(uinput)
-                    elif "stop" in finish:
-                        break
-                elif finish==None and txt==None:
-                    print(Fore.RED + "i was cut i will continue...\n" + ColoramaStyle.RESET_ALL)
-                    summary = summary.strip().split("\n")
-                    summary_string = "\n".join(summary)
-                    texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
-                    conversation_log.append(texttoadd)
-                    save_conversation(texttoadd)
-                    uinput="read history u cut ur response continue  eaxctly where u left off" 
-                    return get_bot_response(uinput)
+                # if finish:            
+                #     if "length" in finish:
+                #         print(Fore.RED + "i was cut i will continue...\n" + ColoramaStyle.RESET_ALL)
+                #         summary = summary.strip().split("\n")
+                #         summary_string = "\n".join(summary)
+                #         texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                #         conversation_log.append(texttoadd)
+                #         save_conversation(texttoadd)
+                #         uinput="read history u cut ur response continue  eaxctly where u left off" 
+                #         return get_bot_response(uinput)
+                #     elif "stop" in finish:
+                #         break
+                # elif finish==None and txt==None:
+                #     print(Fore.RED + "i was cut i will continue...\n" + ColoramaStyle.RESET_ALL)
+                #     summary = summary.strip().split("\n")
+                #     summary_string = "\n".join(summary)
+                #     texttoadd=f"{timestamp} {bot_name}: {summary_string}\n"
+                #     conversation_log.append(texttoadd)
+                #     save_conversation(texttoadd)
+                #     uinput="read history u cut ur response continue  eaxctly where u left off" 
+                #     return get_bot_response(uinput)
             if not req:
                 print("\n")   
             summary = summary.strip().split("\n")

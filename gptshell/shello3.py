@@ -38,7 +38,7 @@ help_text = (
     )
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-modelSource = "gpt-4o"
+modelSource = "o3-mini-2025-01-31"
 #modelSource = "gpt-4"
 uhistory = []
 bhistory = []
@@ -110,8 +110,11 @@ def get_bot_response(uinput):
         model=modelSource,
         messages=[
             {
-                'role': 'system',
-                'content': '''
+                "role": "developer",
+                "content": [
+                    {
+                        "type": "text",
+                        "text":  '''
                 1. You are an expert in Linux commands, responding to queries with concise command examples only. 
                 q. Provide direct Linux command responses without explanations, text, context, code block markers, or language specifications. 
                 2. Your responses should consist solely of the command needed to fulfill the request, with no additional formatting or instructions.
@@ -121,8 +124,9 @@ def get_bot_response(uinput):
                 6. when you need to do give respond of search or similiar command always redirect error output to null
                 7. if its command that probably need permission -then you must add 'sudo' to your command.
                 8. do not repeat commands if you did already in the last response. if user humor your with not commands question then answer him in command only with humor way
-
                 '''
+                    }
+                ]
             },
             {
                 'role': 'assistant',
@@ -142,8 +146,9 @@ def get_bot_response(uinput):
             
         ],
         stream=True,
-        temperature=0.7,
-        max_tokens=500
+        reasoning_effort="high",
+        # temperature=0.7,
+        # max_tokens=500
         )
         summary=""
         temptext=""

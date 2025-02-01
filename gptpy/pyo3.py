@@ -37,7 +37,7 @@ help_text = (f"{Fore.CYAN}Usage:{Style.RESET_ALL} script_name.py [OPTION]\n\n" +
 
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-modelSource = "gpt-4o"
+modelSource = "o3-mini-2025-01-31"
 uhistory = []
 bhistory = []
 conversation_log =[]
@@ -126,9 +126,13 @@ def get_bot_response(uinput):
         response = client.chat.completions.create(
             model=modelSource,
             messages=[
-               {
-            'role': 'system',
-            'content': '''
+             
+        {
+            "role": "developer",
+            "content": [
+                {
+                "type": "text",
+                "text": '''
             you must read and follow this orders precisely:
             1. You are an expert in python code, i want you be expert on all libraries of python. you gonna respond to queries with concise code only. 
             2. Provide direct code responses without explanations, text, context, code block markers, or language specifications. 
@@ -151,7 +155,10 @@ def get_bot_response(uinput):
                 example to change practicalr lines only or to replace word with another - in this example and similar you can find the way with ew python to find this lines or words and chnage them remotly by code.
             16. i remind you that all further update on same project you need to make done on same file name so dont make up new name until its totaly new project
             '''
-        },
+            
+                }
+            ]
+            },
         {
             'role': 'assistant',
             'content': f'''
@@ -169,8 +176,9 @@ def get_bot_response(uinput):
         },
             ],
             stream=True,
-            temperature=1,
-            max_tokens=3000
+            reasoning_effort="high",
+            # temperature=1,
+            # max_tokens=3000
         )
         summary=""
         temptext=""
